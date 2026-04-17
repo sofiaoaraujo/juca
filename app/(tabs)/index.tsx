@@ -26,7 +26,7 @@ export default function JucaOnboarding() {
 
   const alimentos = [
     // FRUTAS
-    { name: 'Banana', icon: 'food-variant', color: '#FFF9C4' },
+    { name: 'Banana', icon: 'food-banana', color: '#FFF9C4' },
     { name: 'Maçã', icon: 'food-apple', color: '#FFEBEE' },
     { name: 'Pêra', icon: 'food-apple-outline', color: '#F1F8E9' },
     { name: 'Mamão', icon: 'blur', color: '#FFE0B2' },
