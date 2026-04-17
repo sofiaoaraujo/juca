@@ -1,6 +1,10 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { Dimensions, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import MaskInput from 'react-native-mask-input';
+
+const dataMask = [/\d/, /\d/, '/', /\d/, /\d/, '/', /\d/, /\d/, /\d/, /\d/];
+
 
 const { width } = Dimensions.get('window');
 
@@ -122,14 +126,17 @@ export default function JucaOnboarding() {
       <Header />
       <Text style={styles.questionText}>Quando ele(a) nasceu?</Text>
       <View style={styles.inputBlock}>
-        <TextInput 
-          style={styles.textInput} 
-          placeholder="DD / MM / AAAA" 
+        <MaskInput
+          style={styles.textInput}
+          placeholder="DD / MM / AAAA"
           keyboardType="numeric"
           maxLength={10}
           value={dataNasc}
-          onChangeText={formatarData}
-        />
+          mask={dataMask}
+          onChangeText={(masked, unmasked) => {
+    formatarData(masked); // ou setDataNasc(masked)
+  }}
+/>
         <MaterialCommunityIcons name="calendar-month-outline" size={20} color="#5e5c54" />
       </View>
       <ArrowButton onPress={nextStep} disabled={dataNasc.length < 10} />
