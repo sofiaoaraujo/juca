@@ -39,8 +39,8 @@ yarn-error.*
 app-example
 
 # generated native folders
-/ios
-/android
+/FRONT-END/ios
+/FRONT-END/android
 
 # Python virtual environments
 venv/
