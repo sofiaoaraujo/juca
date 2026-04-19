@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import MaskInput from 'react-native-mask-input';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFilhos } from '../../context/FilhosContext';
 
 const dataMask = [/\d/, /\d/, '/', /\d/, /\d/, '/', /\d/, /\d/, /\d/, /\d/];
 
@@ -21,6 +22,7 @@ const { width } = Dimensions.get('window');
 
 export default function JucaOnboarding() {
   const router = useRouter();
+  const { adicionarFilho } = useFilhos();
   const [step, setStep] = useState(0);
   const [nomeUsuario, setNomeUsuario] = useState('');
   const [nome, setNome] = useState('');
@@ -46,29 +48,27 @@ export default function JucaOnboarding() {
   const handleFinalizar = async () => {
     setSalvando(true);
     try {
-      const dados = {
+      // Salva nome do responsável no AsyncStorage
+      await AsyncStorage.setItem('@juca:nomeUsuario', nomeUsuario);
+
+      // Salva o filho no FilhosContext (AsyncStorage unificado)
+      await adicionarFilho({
         nome,
         dataNasc,
         sexo,
         alergias,
         neuro,
         alimentosSelecionados,
-      };
-
-      // Salva os nomes localmente para usar na home
-      await AsyncStorage.setItem('@juca:nomeFilho', nome);
-      await AsyncStorage.setItem('@juca:nomeUsuario', nomeUsuario);
-      await AsyncStorage.setItem('@juca:sexoFilho', sexo);
+      });
 
       // ✅ Salvar no banco de dados aqui
       // await fetch('https://sua-api.com/cadastro', {
       //   method: 'POST',
       //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(dados),
+      //   body: JSON.stringify({ nomeUsuario, nome, dataNasc, sexo, alergias, neuro, alimentosSelecionados }),
       // });
 
-      console.log('Dados salvos:', dados);
-      router.push('/home');
+      router.replace('/(tabs)/home');
     } catch (error) {
       console.error('Erro ao salvar:', error);
       Alert.alert('Erro', 'Não foi possível salvar os dados. Tente novamente.');
@@ -79,17 +79,17 @@ export default function JucaOnboarding() {
 
   const alimentos = [
     // FRUTAS
-    { name: 'Banana', icon: 'food-variant', color: '#FFF9C4' },
+    { name: 'Banana', icon: 'fruit-cherries', color: '#FFF9C4' },
     { name: 'Maçã', icon: 'food-apple', color: '#FFEBEE' },
-    { name: 'Mamão', icon: 'fruit-cherries', color: '#FFE0B2' },
+    { name: 'Mamão', icon: 'fruit-pineapple', color: '#FFE0B2' },
     { name: 'Manga', icon: 'fruit-grapes', color: '#FFF3E0' },
     { name: 'Melancia', icon: 'fruit-watermelon', color: '#FCE4EC' },
     // VERDURAS E LEGUMES
     { name: 'Cenoura', icon: 'carrot', color: '#FFF3E0' },
     { name: 'Brócolis', icon: 'sprout', color: '#E8F5E9' },
-    { name: 'Abobrinha', icon: 'seed-outline', color: '#F1F8E9' },
+    { name: 'Abobrinha', icon: 'leaf', color: '#F1F8E9' },
     { name: 'Beterraba', icon: 'circle-slice-8', color: '#FCE4EC' },
-    { name: 'Chuchu', icon: 'leaf', color: '#F0F4C3' },
+    { name: 'Chuchu', icon: 'leaf-circle-outline', color: '#F0F4C3' },
     // CARBOIDRATOS
     { name: 'Arroz', icon: 'rice', color: '#F5F5F5' },
     { name: 'Batata', icon: 'pot-steam-outline', color: '#FFF8E1' },
