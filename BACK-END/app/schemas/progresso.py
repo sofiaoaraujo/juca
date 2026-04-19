@@ -1,0 +1,98 @@
+# app/schemas/progresso.py
+# Modelos Pydantic para o progresso de uma criança com um alimento.
+# Reflete a tabela 'crianca_alimento' e incorpora a lógica da Trilha ABA.
+
+from pydantic import BaseModel, Field, field_validator
+from datetime import datetime
+from uuid import UUID
+from typing import Optional
+from app.schemas.alimento import AlimentoResponse
+
+
+# ---------------------------------------------------------------------------
+# Constantes da Trilha ABA (Duolingo)
+# ---------------------------------------------------------------------------
+
+# Status possíveis conforme as etapas da Terapia ABA
+STATUS_PERMITIDOS = {"Tocar", "Cheirar", "Lamber", "Comer", "Aceita", "Recusado"}
+
+
+# ---------------------------------------------------------------------------
+# Schemas de REQUEST
+# ---------------------------------------------------------------------------
+
+class ProgressoCreate(BaseModel):
+    """
+    Payload para registrar ou iniciar o progresso de uma criança com um alimento.
+    O status deve seguir as etapas da Trilha ABA.
+    """
+    crianca_id: UUID = Field(
+        ..., examples=["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
+    )
+    alimento_id: UUID = Field(
+        ..., examples=["7c9e6679-7425-40de-944b-e07fc1f90ae7"]
+    )
+    status: str = Field(
+        ...,
+        examples=["Tocar"],
+        description=f"Etapa atual na Trilha ABA. Valores permitidos: {STATUS_PERMITIDOS}",
+    )
+
+    @field_validator("status")
+    @classmethod
+    def validar_status(cls, valor: str) -> str:
+        """Garante que o status informado pertence às etapas da Trilha ABA."""
+        if valor not in STATUS_PERMITIDOS:
+            raise ValueError(
+                f"Status inválido: '{valor}'. "
+                f"Os valores permitidos são: {sorted(STATUS_PERMITIDOS)}"
+            )
+        return valor
+
+
+class ProgressoUpdate(BaseModel):
+    """
+    Payload para atualizar a etapa de um progresso já existente.
+    """
+    status: str = Field(..., examples=["Cheirar"])
+
+    @field_validator("status")
+    @classmethod
+    def validar_status(cls, valor: str) -> str:
+        if valor not in STATUS_PERMITIDOS:
+            raise ValueError(
+                f"Status inválido: '{valor}'. "
+                f"Os valores permitidos são: {sorted(STATUS_PERMITIDOS)}"
+            )
+        return valor
+
+
+# ---------------------------------------------------------------------------
+# Schemas de RESPONSE
+# ---------------------------------------------------------------------------
+
+class ProgressoResponse(BaseModel):
+    """
+    Representa um registro de progresso como retornado pelo banco.
+    """
+    id: UUID
+    created_at: datetime
+    crianca_id: UUID
+    alimento_id: UUID
+    status: str
+
+    model_config = {"from_attributes": True}
+
+
+class ProgressoComAlimentoResponse(BaseModel):
+    """
+    Retorna o progresso junto com os detalhes completos do alimento.
+    Útil para montar a trilha visual no app.
+    """
+    id: UUID
+    created_at: datetime
+    crianca_id: UUID
+    status: str
+    alimento: Optional[AlimentoResponse] = None
+
+    model_config = {"from_attributes": True}
