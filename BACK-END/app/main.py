@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import criancas, alimentos, progresso, usuarios, alergias
+from app.routers import criancas, alimentos, progresso, usuarios, alergias,criancas_alergias
 
 
 # ---------------------------------------------------------------------------
@@ -46,7 +46,7 @@ app.include_router(alimentos.router)
 app.include_router(progresso.router)
 app.include_router(usuarios.router)
 app.include_router(alergias.router)
-
+app.include_router(criancas_alergias.router)
 
 # ---------------------------------------------------------------------------
 # Endpoint de Health Check
