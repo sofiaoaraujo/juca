@@ -47,3 +47,11 @@ venv/
 .venv/
 env/
 .env/
+
+# Pychache 
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+
