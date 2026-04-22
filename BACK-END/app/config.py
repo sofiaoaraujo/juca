@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     app_description: str = (
         "Backend do aplicativo JUCA — auxiliando pais na introdução "
-        "alimentar de crianças com TEA através da Trilha Duolingo (ABA)."
+        "alimentar de crianças com TEA através da Trilha (ABA)."
     )
 
     # Instrui o pydantic-settings a ler o arquivo .env na raiz do projeto
