@@ -15,6 +15,7 @@ import {
 import MaskInput from 'react-native-mask-input';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../../context/FilhosContext';
+import api from '../../services/api';
 
 const dataMask = [/\d/, /\d/, '/', /\d/, /\d/, '/', /\d/, /\d/, /\d/, /\d/];
 
@@ -61,12 +62,15 @@ export default function JucaOnboarding() {
         alimentosSelecionados,
       });
 
-      // ✅ Salvar no banco de dados aqui
-      // await fetch('https://sua-api.com/cadastro', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ nomeUsuario, nome, dataNasc, sexo, alergias, neuro, alimentosSelecionados }),
-      // });
+      // ✅ Salvar no banco de dados aqui , **CONEXÃO COM BACK-END**
+
+      const response = await api.post('/criancas/', {
+        nome: nome,
+        data_nascimento: dataNasc.split('/').reverse().join('-'), // Converte de DD/MM/AAAA para AAAA-MM-DD
+        cuidador_id: 'ded52033-517c-4357-9b74-abe0d084b061'       // Substitua pelo ID real do cuidador, que deve ser obtido após o login ou cadastro do responsável (ANALISAR ESSA PARTE DEPOIS)**
+      });
+
+      //const criancaDaAPI = response.data; // Guarda a resposta da API, que inclui o ID gerado (ANALISAR SE VAI SER USADO DEPOIS)**
 
       router.replace('/(tabs)/home');
     } catch (error) {
