@@ -177,8 +177,6 @@ export default function Configuracoes() {
         {/* ── Sobre o app ── */}
         <Text style={[styles.secaoTitulo, { marginTop: 32 }]}>SOBRE O APP</Text>
         <View style={styles.sobreCard}>
-          <ItemMenu icone="file-document-outline" texto="Política de Privacidade" onPress={() => {}} />
-          <ItemMenu icone="shield-check-outline" texto="Termos de Uso" onPress={() => {}} />
           <ItemMenu icone="information-outline" texto="Versão 1.0.0 (MVP)" onPress={() => {}} semSeta />
         </View>
 
