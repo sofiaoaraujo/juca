@@ -64,7 +64,6 @@ export default function JucaOnboarding() {
 
       // ✅ Salvar no banco de dados aqui , **CONEXÃO COM BACK-END**
 
-<<<<<<< HEAD
       //Busca todos os alimentos do banco para mapear nome → id
       const alimentosDB = await api.get('/alimentos/');
 
@@ -90,15 +89,6 @@ export default function JucaOnboarding() {
           });
         }
       }
-=======
-      const response = await api.post('/criancas/', {
-        nome: nome,
-        data_nascimento: dataNasc.split('/').reverse().join('-'), // Converte de DD/MM/AAAA para AAAA-MM-DD
-        cuidador_id: 'ded52033-517c-4357-9b74-abe0d084b061'       // Substitua pelo ID real do cuidador, que deve ser obtido após o login ou cadastro do responsável (ANALISAR ESSA PARTE DEPOIS)**
-      });
-
-      //const criancaDaAPI = response.data; // Guarda a resposta da API, que inclui o ID gerado (ANALISAR SE VAI SER USADO DEPOIS)**
->>>>>>> ef25c7caa69076bfa0f73e8de86823f5899f27dc
 
       router.replace('/(tabs)/home');
     } catch (error) {
