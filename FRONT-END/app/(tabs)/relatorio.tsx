@@ -248,8 +248,8 @@ export default function Relatorio() {
           <div class="label">DADOS DA CRIANÇA</div>
           <p><strong>Nome:</strong> ${nomeFilho} &nbsp; <strong>Idade:</strong> ${idade || '—'} &nbsp; <strong>Sexo:</strong> ${sexoFilho || '—'}</p>
           <p><strong>Responsável:</strong> ${nomeUsuario}</p>
-          ${alergias ? `<p style="color:#b22300;"><strong>⚠ Alergias:</strong> ${alergias}</p>` : ''}
-          ${neuro ? `<p><strong>🧠 Neurodivergência:</strong> ${neuro}</p>` : ''}
+          ${alergias ? `<p style="color:#b22300;"><strong>Alergias:</strong> ${alergias}</p>` : ''}
+          ${neuro ? `<p><strong>Neurodivergência:</strong> ${neuro}</p>` : ''}
         </div>
         <div class="grid">
           <div class="stat"><div class="stat-n">${totalSessoes}</div><div class="stat-l">SESSÕES</div></div>
@@ -411,8 +411,14 @@ export default function Relatorio() {
 
           <Text style={styles.detalheLabel}>MÉTODO</Text>
           <View style={styles.metodoBox}>
-            <Text style={styles.metodoTexto}>🔗 Food Chaining — sugestão baseada em preferências existentes</Text>
-            <Text style={styles.metodoTexto}>✋ SOS Feeding — 6 etapas sensoriais progressivas</Text>
+            <View style={styles.metodoItem}>
+              <MaterialCommunityIcons name="link-variant" size={15} color="#904c1f" />
+              <Text style={styles.metodoTexto}>Food Chaining — sugestão baseada em preferências existentes</Text>
+            </View>
+            <View style={styles.metodoItem}>
+              <MaterialCommunityIcons name="hand-wave-outline" size={15} color="#904c1f" />
+              <Text style={styles.metodoTexto}>SOS Feeding — 6 etapas sensoriais progressivas</Text>
+            </View>
           </View>
         </Secao>
 
@@ -487,8 +493,9 @@ const styles = StyleSheet.create({
   etapaChipFeita: { backgroundColor: '#b22300' },
   etapaChipText: { fontSize: 10, color: '#5e5c54', fontWeight: '600' },
   etapaChipTextFeita: { color: '#fff' },
-  metodoBox: { backgroundColor: '#f6f4ea', borderRadius: 14, padding: 14, gap: 8 },
-  metodoTexto: { fontSize: 13, color: '#5e5c54', lineHeight: 20 },
+  metodoBox: { backgroundColor: '#f6f4ea', borderRadius: 14, padding: 14, gap: 10 },
+  metodoItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  metodoTexto: { flex: 1, fontSize: 13, color: '#5e5c54', lineHeight: 20 },
 
   footer: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 24, paddingTop: 14, paddingBottom: Platform.OS === 'ios' ? 32 : 20, backgroundColor: '#fcf9ef' },
   pdfBtn: { backgroundColor: '#b22300', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 18, borderRadius: 100, elevation: 4, shadowColor: '#b22300', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 12 },

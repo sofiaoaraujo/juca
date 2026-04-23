@@ -11,7 +11,8 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-function RootNavigator() {
+export default function RootLayout() {
+  const colorScheme = useColorScheme();
   const router = useRouter();
 
   useEffect(() => {
@@ -20,27 +21,23 @@ function RootNavigator() {
       if (filhos.length > 0) {
         router.replace('/(tabs)/home');
       } else {
-        router.replace('/');
+        router.replace('/login');
       }
     });
   }, []);
 
   return (
-    <Stack>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      <Stack.Screen name="onboarding-filho" options={{ headerShown: false }} />
-    </Stack>
-  );
-}
-
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
-  return (
     <FilhosProvider>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <RootNavigator />
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="cadastro" options={{ headerShown: false }} />
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="onboarding-filho" options={{ headerShown: false }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+          <Stack.Screen name="recuperar-senha" options={{ headerShown: false }} />
+        </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>
     </FilhosProvider>

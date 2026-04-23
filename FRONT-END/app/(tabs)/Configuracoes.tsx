@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -18,6 +19,24 @@ import { useFilhos, type Filho } from '../../context/FilhosContext';
 export default function Configuracoes() {
   const router = useRouter();
   const { filhos, filhoAtivo, setFilhoAtivo, editarFilho, removerFilho } = useFilhos();
+
+  const handleSair = async () => {
+    Alert.alert(
+      'Sair da conta',
+      'Tem certeza? Todos os dados locais serão apagados.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sair',
+          style: 'destructive',
+          onPress: async () => {
+            await AsyncStorage.clear();
+            router.replace('/login');
+          },
+        },
+      ]
+    );
+  };
 
   const [filhoEditando, setFilhoEditando] = useState<Filho | null>(null);
   const [modalEditar, setModalEditar] = useState(false);
@@ -117,10 +136,16 @@ export default function Configuracoes() {
                     {filho.sexo} · {idade || filho.dataNasc}
                   </Text>
                   {filho.alergias ? (
-                    <Text style={styles.filhoAlergia}>⚠ {filho.alergias}</Text>
+                    <View style={styles.filhoTagRow}>
+                      <MaterialCommunityIcons name="alert-circle-outline" size={13} color="#b22300" />
+                      <Text style={styles.filhoAlergia}>{filho.alergias}</Text>
+                    </View>
                   ) : null}
                   {filho.neuro ? (
-                    <Text style={styles.filhoNeuro}>🧠 {filho.neuro}</Text>
+                    <View style={styles.filhoTagRow}>
+                      <MaterialCommunityIcons name="brain" size={13} color="#904c1f" />
+                      <Text style={styles.filhoNeuro}>{filho.neuro}</Text>
+                    </View>
                   ) : null}
                 </View>
               </View>
@@ -179,6 +204,16 @@ export default function Configuracoes() {
         <View style={styles.sobreCard}>
           <ItemMenu icone="information-outline" texto="Versão 1.0.0 (MVP)" onPress={() => {}} semSeta />
         </View>
+
+        {/* ── Sair ── */}
+        <TouchableOpacity
+          activeOpacity={0.75}
+          style={styles.sairBtn}
+          onPress={handleSair}
+        >
+          <MaterialCommunityIcons name="logout" size={20} color="#b22300" />
+          <Text style={styles.sairText}>Sair da conta</Text>
+        </TouchableOpacity>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -344,8 +379,9 @@ const styles = StyleSheet.create({
   ativoBadge: { backgroundColor: '#b22300', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100 },
   ativoBadgeText: { fontSize: 9, fontWeight: '700', color: '#fff', letterSpacing: 1 },
   filhoDetalhe: { fontSize: 13, color: '#5e5c54', marginBottom: 4 },
-  filhoAlergia: { fontSize: 12, color: '#b22300', fontWeight: '600', marginTop: 2 },
-  filhoNeuro: { fontSize: 12, color: '#904c1f', fontWeight: '600', marginTop: 2 },
+  filhoTagRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  filhoAlergia: { fontSize: 12, color: '#b22300', fontWeight: '600' },
+  filhoNeuro: { fontSize: 12, color: '#904c1f', fontWeight: '600' },
   filhoAcoes: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   acaoBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f6f4ea', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 100 },
   acaoBtnPerigo: { backgroundColor: '#fff5f3' },
@@ -363,6 +399,20 @@ const styles = StyleSheet.create({
   sobreCard: { backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden', shadowColor: '#4b4944', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 1 },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 18, borderBottomWidth: 1, borderBottomColor: '#f6f4ea' },
   menuItemTexto: { flex: 1, fontSize: 15, color: '#1b1c16', fontWeight: '500' },
+  sairBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 24,
+    marginBottom: 16,
+    paddingVertical: 18,
+    borderRadius: 100,
+    backgroundColor: '#fff5f3',
+    borderWidth: 1.5,
+    borderColor: 'rgba(178,35,0,0.2)',
+  },
+  sairText: { fontSize: 15, fontWeight: '700', color: '#b22300' },
 
   // Modal editar
   modalContainer: { flex: 1, backgroundColor: '#fcf9ef' },

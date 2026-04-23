@@ -1,5 +1,4 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -14,8 +13,7 @@ import {
 } from 'react-native';
 import MaskInput from 'react-native-mask-input';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFilhos } from '../../context/FilhosContext';
-import api from '../../services/api';
+import { useFilhos } from '../context/FilhosContext';
 
 const dataMask = [/\d/, /\d/, '/', /\d/, /\d/, '/', /\d/, /\d/, /\d/, /\d/];
 
@@ -25,16 +23,15 @@ export default function JucaOnboarding() {
   const router = useRouter();
   const { adicionarFilho } = useFilhos();
   const [step, setStep] = useState(0);
-  const [nomeUsuario, setNomeUsuario] = useState('');
   const [nome, setNome] = useState('');
   const [dataNasc, setDataNasc] = useState('');
   const [sexo, setSexo] = useState('');
   const [alergias, setAlergias] = useState('');
-  const [neuro, setNeuro] = useState('');
+  const [neuro, setNeuro] = useState<string[]>([]);
   const [alimentosSelecionados, setAlimentosSelecionados] = useState<string[]>([]);
   const [salvando, setSalvando] = useState(false);
 
-  const totalSteps = 7;
+  const totalSteps = 6;
   const nextStep = () => setStep(step + 1);
   const prevStep = () => setStep(Math.max(0, step - 1));
 
@@ -46,49 +43,37 @@ export default function JucaOnboarding() {
     );
   };
 
+  const toggleNeuro = (opcao: string) => {
+    if (opcao === 'Nenhuma') {
+      setNeuro(['Nenhuma']);
+      return;
+    }
+    setNeuro(prev => {
+      const semNenhuma = prev.filter(n => n !== 'Nenhuma');
+      return semNenhuma.includes(opcao)
+        ? semNenhuma.filter(n => n !== opcao)
+        : [...semNenhuma, opcao];
+    });
+  };
+
   const handleFinalizar = async () => {
     setSalvando(true);
     try {
-      // Salva nome do responsável no AsyncStorage
-      await AsyncStorage.setItem('@juca:nomeUsuario', nomeUsuario);
-
-      // Salva o filho no FilhosContext (AsyncStorage unificado)
       await adicionarFilho({
         nome,
         dataNasc,
         sexo,
         alergias,
-        neuro,
+        neuro: neuro.join(', '),
         alimentosSelecionados,
       });
 
-      // ✅ Salvar no banco de dados aqui , **CONEXÃO COM BACK-END**
-
-      //Busca todos os alimentos do banco para mapear nome → id
-      const alimentosDB = await api.get('/alimentos/');
-
-
-      const response = await api.post('/criancas/', {
-        nome: nome,
-        data_nascimento: dataNasc.split('/').reverse().join('-'), // Converte de DD/MM/AAAA para AAAA-MM-DD
-        cuidador_id: 'b594dcf7-51ee-405a-9fb4-eb60befd19f9', // Substitua pelo ID real do cuidador, que deve ser obtido após o login ou cadastro do responsável (ANALISAR ESSA PARTE DEPOIS)**
-        sexo: sexo       
-      });
-
-      const criancaDaAPI = response.data; // O objeto retornado pelo backend após criar a criança
-      const criancaId = criancaDaAPI.id; // ID retornado pelo backend
-
-      // Salva cada alimento vinculado à criança
-      for (const nomeAlimento of alimentosSelecionados) {
-        const alimento = alimentosDB.data.find((a: any) => a.nome === nomeAlimento);
-        if (alimento) {
-          await api.post('/progresso/', {    // ! É progresso mesmo, não mude
-            crianca_id: criancaId,
-            alimento_id: alimento.id,
-            status: 'Aceita',               // * PODE MUDAR DEPOIS, DEPENDE DE COMO VAMOS GERENCIAR ESSA PARTE DE ACEITO/RECUSADO/NEUTRO
-          });
-        }
-      }
+      // ✅ Salvar no banco de dados aqui
+      // await fetch('https://sua-api.com/cadastro', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ nome, dataNasc, sexo, alergias, neuro, alimentosSelecionados }),
+      // });
 
       router.replace('/(tabs)/home');
     } catch (error) {
@@ -181,24 +166,6 @@ export default function JucaOnboarding() {
   if (step === 2) return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
-      <Text style={styles.questionText}>Qual é o seu nome?</Text>
-      <View style={styles.inputBlock}>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Como devemos te chamar?"
-          placeholderTextColor="#5e5c5480"
-          value={nomeUsuario}
-          onChangeText={setNomeUsuario}
-          autoFocus
-        />
-      </View>
-      <ArrowButton onPress={nextStep} disabled={!nomeUsuario} />
-    </SafeAreaView>
-  );
-
-  if (step === 3) return (
-    <SafeAreaView style={styles.fullScreen}>
-      <Header />
       <Text style={styles.questionText}>Qual o nome do seu pequeno?</Text>
       <View style={styles.inputBlock}>
         <TextInput
@@ -214,7 +181,7 @@ export default function JucaOnboarding() {
     </SafeAreaView>
   );
 
-  if (step === 4) return (
+  if (step === 3) return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
       <Text style={styles.questionText}>Quando ele(a) nasceu?</Text>
@@ -235,7 +202,7 @@ export default function JucaOnboarding() {
     </SafeAreaView>
   );
 
-  if (step === 5) return (
+  if (step === 4) return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
       <Text style={styles.questionText}>Qual o sexo biológico?</Text>
@@ -255,28 +222,49 @@ export default function JucaOnboarding() {
     </SafeAreaView>
   );
 
-  if (step === 6) return (
+  if (step === 5) return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
-      <Text style={styles.questionText}>Alguma restrição ou condição especial?</Text>
-      <View style={[styles.inputBlock, { marginBottom: 20 }]}>
+      <Text style={styles.questionText}>Alguma alergia alimentar?</Text>
+      <Text style={styles.questionSub}>Opcional — liste as alergias conhecidas</Text>
+      <View style={styles.inputBlock}>
         <TextInput
-          style={styles.textInput}
-          placeholder="Alergias (Opcional)"
+          style={[styles.textInput, { minHeight: 80, textAlignVertical: 'top' }]}
+          placeholder="Ex: Amendoim, Lactose, Glúten..."
           placeholderTextColor="#5e5c5480"
           value={alergias}
           onChangeText={setAlergias}
+          multiline
         />
       </View>
-      <View style={styles.inputBlock}>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Neurodivergência (Opcional)"
-          placeholderTextColor="#5e5c5480"
-          value={neuro}
-          onChangeText={setNeuro}
-        />
-        <MaterialCommunityIcons name="brain" size={20} color="#904c1f" />
+      <ArrowButton onPress={nextStep} />
+    </SafeAreaView>
+  );
+
+  if (step === 6) return (
+    <SafeAreaView style={styles.fullScreen}>
+      <Header />
+      <Text style={styles.questionText}>Alguma neurodivergência?</Text>
+      <Text style={styles.questionSub}>Opcional — selecione todas que se aplicam</Text>
+      <View style={styles.optionsGrid}>
+        {['TEA', 'TDAH', 'Transtorno de Ansiedade', 'TARE', 'Outra', 'Nenhuma'].map((opcao) => (
+          <TouchableOpacity
+            key={opcao}
+            activeOpacity={0.7}
+            style={[
+              styles.neuroBtn,
+              neuro.includes(opcao) && styles.neuroBtnActive,
+            ]}
+            onPress={() => toggleNeuro(opcao)}
+          >
+            <Text style={[
+              styles.neuroText,
+              neuro.includes(opcao) && styles.neuroTextActive,
+            ]}>
+              {opcao}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
       <ArrowButton onPress={nextStep} />
     </SafeAreaView>
@@ -375,6 +363,24 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   reflectSub: { fontSize: 18, color: '#5e5c54', textAlign: 'center', lineHeight: 28 },
+  questionSub: { fontSize: 14, color: '#5e5c54', marginBottom: 20, marginTop: -20 },
+  optionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  neuroBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 100,
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#e4e3d9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  neuroBtnActive: { backgroundColor: '#b22300', borderColor: '#b22300' },
+  neuroText: { fontSize: 15, fontWeight: '600', color: '#1b1c16' },
+  neuroTextActive: { color: '#fff' },
   questionText: { fontSize: 32, fontWeight: '800', color: '#1b1c16', marginBottom: 30 },
 
   inputBlock: {
