@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field
 from datetime import date, datetime
 from uuid import UUID
 from typing import Optional
-<<<<<<< HEAD
 from enum import Enum
 
 
@@ -14,10 +13,6 @@ class SexoEnum(str, Enum):
     feminino = 'Feminino'
     masculino = 'Masculino'
 
-=======
-
-
->>>>>>> ef25c7caa69076bfa0f73e8de86823f5899f27dc
 # ---------------------------------------------------------------------------
 # Schemas de REQUEST (dados que chegam do cliente → API)
 # ---------------------------------------------------------------------------
@@ -38,10 +33,7 @@ class CriancaCreate(BaseModel):
         examples=["3fa85f64-5717-4562-b3fc-2c963f66afa6"],
         description="UUID do usuário (cuidador) responsável pela criança",
     )
-<<<<<<< HEAD
     sexo: Optional[SexoEnum] = None # <--- 3. Troque str por SexoEnum
-=======
->>>>>>> ef25c7caa69076bfa0f73e8de86823f5899f27dc
 
 
 class CriancaUpdate(BaseModel):
@@ -51,11 +43,7 @@ class CriancaUpdate(BaseModel):
     """
     nome: Optional[str] = Field(default=None, min_length=2, max_length=100)
     data_nascimento: Optional[date] = None
-<<<<<<< HEAD
     sexo: Optional[SexoEnum] = None # <--- 3. Troque str por SexoEnum
-=======
-
->>>>>>> ef25c7caa69076bfa0f73e8de86823f5899f27dc
 
 # ---------------------------------------------------------------------------
 # Schemas de RESPONSE (dados que a API devolve ao cliente)
@@ -70,10 +58,7 @@ class CriancaResponse(BaseModel):
     nome: str
     data_nascimento: Optional[date] = None
     cuidador_id: UUID
-<<<<<<< HEAD
     sexo: Optional[SexoEnum] = None # <--- 3. Troque str por SexoEnum
-=======
->>>>>>> ef25c7caa69076bfa0f73e8de86823f5899f27dc
 
     # Permite que o Pydantic leia diretamente de objetos ORM / dicts
     model_config = {"from_attributes": True}
