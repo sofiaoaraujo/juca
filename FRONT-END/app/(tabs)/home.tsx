@@ -398,16 +398,12 @@ export default function Home() {
   const [carregandoSugestoes, setCarregandoSugestoes] = useState(false);
 
   const carregarSugestoes = async () => {
-    if (!filhoAtivo) return;
+    if (!filhoAtivo?.id) return;
     setCarregandoSugestoes(true);
     try {
-      const alimentosAceitos = filhoAtivo.alimentosSelecionados ?? [];
-      const resultado = await obterSugestoesFoodChaining(
-        filhoAtivo.nome,
-        filhoAtivo.alergias ?? '',
-        filhoAtivo.neuro ?? '',
-        alimentosAceitos,
-      );
+      // ✅ Chamada simplificada enviando apenas o ID!
+      const resultado = await obterSugestoesFoodChaining(filhoAtivo.id);
+      
       const comCores = resultado.map(s => {
         const cores = CORES_CATEGORIA[s.categoria] ?? CORES_CATEGORIA.default;
         return { ...s, name: s.nome, icon: cores.icon, corFundo: cores.fundo, corIcone: cores.icone };
@@ -419,6 +415,7 @@ export default function Home() {
       setCarregandoSugestoes(false);
     }
   };
+  
   const [trilhaVisivel, setTrilhaVisivel] = useState(false);
   const [etapasConcluidas, setEtapasConcluidas] = useState<string[]>([]);
   const [fotosSessao, setFotosSessao] = useState<string[]>([]);

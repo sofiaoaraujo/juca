@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-
 
 export type Filho = {
   id: string;
@@ -24,29 +24,44 @@ type FilhosContextType = {
   recarregar: () => Promise<void>;
 };
 
-
 const FilhosContext = createContext<FilhosContextType | null>(null);
 
 const STORAGE_KEY = '@juca:filhos';
 const ATIVO_KEY = '@juca:filhoAtivoId';
-
 
 export function FilhosProvider({ children }: { children: React.ReactNode }) {
   const [filhos, setFilhos] = useState<Filho[]>([]);
   const [filhoAtivo, setFilhoAtivoState] = useState<Filho | null>(null);
   const [carregando, setCarregando] = useState(true);
 
-  // Carrega do storage
+  // Carrega do storage (MODIFICADO PARA TESTE FORÇADO COM O SUPABASE)
   const recarregar = useCallback(async () => {
     try {
-      const json = await AsyncStorage.getItem(STORAGE_KEY);
-      const ativoId = await AsyncStorage.getItem(ATIVO_KEY);
-      const lista: Filho[] = json ? JSON.parse(json) : [];
+      // 🚨 MODO DE TESTE ABSOLUTO: IGNORANDO O CELULAR 🚨
+      // Criamos o filho ativo diretamente aqui, usando o seu ID do Supabase.
+      
+      const filhoTeste: Filho = {
+        id: "5fb9709a-a394-4e4e-a682-4212b1366ab4", // O SEU ID REAL DO SUPABASE! // ID mockado por enquanto
+        nome: "Mikael (Teste Banco)",
+        dataNasc: "01/01/2020",
+        sexo: "Masculino",
+        alergias: "",
+        neuro: "",
+        alimentosSelecionados: [],
+        criadoEm: new Date().toISOString(),
+      };
+
+      // Força a lista a ter apenas este filho de teste
+      const lista = [filhoTeste];
+      
+      // Atualiza o estado
       setFilhos(lista);
-      if (lista.length > 0) {
-        const ativo = lista.find(f => f.id === ativoId) ?? lista[0];
-        setFilhoAtivoState(ativo);
-      }
+      setFilhoAtivoState(filhoTeste);
+
+      // Salva no celular para não perder e sobrescrever o lixo antigo
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(lista));
+      await AsyncStorage.setItem(ATIVO_KEY, filhoTeste.id);
+
     } catch (e) {
       console.error('Erro ao carregar filhos:', e);
     } finally {
@@ -62,11 +77,11 @@ export function FilhosProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(ATIVO_KEY, filho.id);
   }, []);
 
-  // Adicionar filho
+  // Adicionar filho (AGORA GERA UM UUID REAL DO TIPO BANCO DE DADOS)
   const adicionarFilho = useCallback(async (dados: Omit<Filho, 'id' | 'criadoEm'>) => {
     const novo: Filho = {
       ...dados,
-      id: Date.now().toString(),
+      id: Crypto.randomUUID(), // <-- SOLUÇÃO DEFINITIVA PARA NOVOS CADASTROS
       criadoEm: new Date().toISOString(),
     };
     const novaLista = [...filhos, novo];
@@ -110,7 +125,6 @@ export function FilhosProvider({ children }: { children: React.ReactNode }) {
     </FilhosContext.Provider>
   );
 }
-
 
 export function useFilhos() {
   const ctx = useContext(FilhosContext);
