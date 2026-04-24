@@ -16,9 +16,10 @@ import {
   View,
 } from 'react-native';
 import ConfettiCannon from 'react-native-confetti-cannon';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../../context/FilhosContext';
+import { obterSugestoesFoodChaining, type SugestaoAlimento } from '../../services/gemini';
 
 const { width, height } = Dimensions.get('window');
 const TRILHA_WIDTH = width - 48;
@@ -33,14 +34,10 @@ type SOSEtapa = {
   ehFinal?: boolean;
 };
 
-type AlimentoSugerido = {
-  id: string;
-  name: string;
+type AlimentoSugerido = SugestaoAlimento & {
   icon: string;
   corFundo: string;
   corIcone: string;
-  motivo: string;
-  categoria: string;
 };
 
 // ─── Etapas SOS ──────────────────────────────────────────────────────────────
@@ -64,10 +61,63 @@ const POSICOES_X = [
 const ESPACO_Y = 130;
 const CIRCULO_R = 36;
 
-const SUGESTOES_API: AlimentoSugerido[] = [
-  { id: '1', name: 'Banana Amassada', icon: 'fruit-cherries', corFundo: '#FFFDE7', corIcone: '#FFF9C4', motivo: 'Próximo passo natural da Banana inteira', categoria: 'Fruta' },
-  { id: '2', name: 'Cenoura Cozida', icon: 'carrot', corFundo: '#FFF3E0', corIcone: '#FFE0B2', motivo: 'Textura macia, próxima do Chuchu aceito', categoria: 'Legume' },
-];
+// ─── Cores por categoria ──────────────────────────────────────────────────────
+const CORES_CATEGORIA: Record<string, { fundo: string; icone: string; icon: string }> = {
+  Fruta:       { fundo: '#FFFDE7', icone: '#FFF9C4', icon: 'fruit-cherries' },
+  Legume:      { fundo: '#FFF3E0', icone: '#FFE0B2', icon: 'carrot' },
+  Verdura:     { fundo: '#F1F8E9', icone: '#DCEDC8', icon: 'leaf' },
+  Proteína:    { fundo: '#FCE4EC', icone: '#F8BBD0', icon: 'food-steak' },
+  Carboidrato: { fundo: '#FFF8E1', icone: '#FFECB3', icon: 'bread-slice' },
+  Laticínio:   { fundo: '#E3F2FD', icone: '#BBDEFB', icon: 'cup' },
+  default:     { fundo: '#F3E5F5', icone: '#E1BEE7', icon: 'food' },
+};
+
+// ─── Componente de loading com caju pulsando ─────────────────────────────────
+function CajuLoading() {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.12, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.92, duration: 900, useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, []);
+
+  return (
+    <View style={cajuLoadingStyles.container}>
+      <Animated.Image
+        source={require('../../assets/images/caju-loading.png')}
+        style={[cajuLoadingStyles.imagem, { transform: [{ scale: pulseAnim }] }]}
+        resizeMode="contain"
+      />
+      <Text style={cajuLoadingStyles.texto}>Preparando sugestões...</Text>
+    </View>
+  );
+}
+
+const cajuLoadingStyles = StyleSheet.create({
+  container: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    marginBottom: 28,
+  },
+  imagem: {
+    width: 100,
+    height: 100,
+    marginBottom: 16,
+  },
+  texto: {
+    fontSize: 14,
+    color: '#904c1f',
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+});
 
 // ─── Componente Trilha ────────────────────────────────────────────────────────
 function TrilhaSOS({
@@ -344,6 +394,31 @@ export default function Home() {
   const [nomeUsuario, setNomeUsuario] = useState('');
   const [seletorVisivel, setSeletorVisivel] = useState(false);
   const [alimentoAtivo, setAlimentoAtivo] = useState<AlimentoSugerido | null>(null);
+  const [sugestoes, setSugestoes] = useState<AlimentoSugerido[]>([]);
+  const [carregandoSugestoes, setCarregandoSugestoes] = useState(false);
+
+  const carregarSugestoes = async () => {
+    if (!filhoAtivo) return;
+    setCarregandoSugestoes(true);
+    try {
+      const alimentosAceitos = filhoAtivo.alimentosSelecionados ?? [];
+      const resultado = await obterSugestoesFoodChaining(
+        filhoAtivo.nome,
+        filhoAtivo.alergias ?? '',
+        filhoAtivo.neuro ?? '',
+        alimentosAceitos,
+      );
+      const comCores = resultado.map(s => {
+        const cores = CORES_CATEGORIA[s.categoria] ?? CORES_CATEGORIA.default;
+        return { ...s, name: s.nome, icon: cores.icon, corFundo: cores.fundo, corIcone: cores.icone };
+      });
+      setSugestoes(comCores);
+    } catch (error) {
+      console.error('Erro ao buscar sugestões:', error);
+    } finally {
+      setCarregandoSugestoes(false);
+    }
+  };
   const [trilhaVisivel, setTrilhaVisivel] = useState(false);
   const [etapasConcluidas, setEtapasConcluidas] = useState<string[]>([]);
   const [fotosSessao, setFotosSessao] = useState<string[]>([]);
@@ -353,6 +428,10 @@ export default function Home() {
   useEffect(() => {
     AsyncStorage.getItem('@juca:nomeUsuario').then(v => { if (v) setNomeUsuario(v); });
   }, []);
+
+  useEffect(() => {
+    if (filhoAtivo) carregarSugestoes();
+  }, [filhoAtivo?.id]);
 
   const abrirTrilha = (alimento: AlimentoSugerido) => {
     setAlimentoAtivo(alimento);
@@ -379,7 +458,7 @@ export default function Home() {
       const sessao = {
         filhoId: filhoAtivo?.id,
         alimentoId: alimentoAtivo?.id,
-        alimento: alimentoAtivo?.name,
+        alimento: alimentoAtivo?.nome,
         data: new Date().toISOString(),
         etapasConcluidas,
         totalEtapas: ETAPAS_SOS.length,
@@ -421,22 +500,31 @@ export default function Home() {
         </View>
 
         {/* Cards */}
-        <View style={styles.cardsRow}>
-          {SUGESTOES_API.map((alimento) => (
-            <TouchableOpacity key={alimento.id} activeOpacity={0.75} style={[styles.foodCard, { backgroundColor: alimento.corFundo }]} onPress={() => abrirTrilha(alimento)}>
-              <Text style={styles.cardCategoria}>{alimento.categoria.toUpperCase()}</Text>
-              <View style={[styles.iconeCircle, { backgroundColor: alimento.corIcone }]}>
-                <MaterialCommunityIcons name={alimento.icon as any} size={44} color="#904c1f" />
-              </View>
-              <Text style={styles.cardNome}>{alimento.name}</Text>
-              <Text style={styles.cardMotivo}>{alimento.motivo}</Text>
-              <View style={styles.cardBotao}>
-                <Text style={styles.cardBotaoText}>Iniciar Trilha</Text>
-                <MaterialCommunityIcons name="arrow-right" size={13} color="#b22300" />
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {carregandoSugestoes ? (
+          <CajuLoading />
+        ) : sugestoes.length > 0 ? (
+          <View style={styles.cardsRow}>
+            {sugestoes.map((alimento) => (
+              <TouchableOpacity key={alimento.id} activeOpacity={0.75} style={[styles.foodCard, { backgroundColor: alimento.corFundo }]} onPress={() => abrirTrilha(alimento)}>
+                <Text style={styles.cardCategoria}>{alimento.categoria.toUpperCase()}</Text>
+                <View style={[styles.iconeCircle, { backgroundColor: alimento.corIcone }]}>
+                  <MaterialCommunityIcons name={alimento.icon as any} size={44} color="#904c1f" />
+                </View>
+                <Text style={styles.cardNome}>{alimento.nome}</Text>
+                <Text style={styles.cardMotivo}>{alimento.motivo}</Text>
+                <View style={styles.cardBotao}>
+                  <Text style={styles.cardBotaoText}>Iniciar Trilha</Text>
+                  <MaterialCommunityIcons name="arrow-right" size={13} color="#b22300" />
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : (
+          <TouchableOpacity activeOpacity={0.8} style={styles.recarregarBox} onPress={carregarSugestoes}>
+            <MaterialCommunityIcons name="refresh" size={24} color="#b22300" />
+            <Text style={styles.recarregarText}>Buscar sugestões</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Progresso */}
         <View style={styles.progressCard}>
@@ -498,7 +586,7 @@ export default function Home() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.trilhaSuper}>TRILHA SENSORIAL · SOS</Text>
-                <Text style={styles.trilhaTitulo} numberOfLines={1}>{alimentoAtivo?.name}</Text>
+                <Text style={styles.trilhaTitulo} numberOfLines={1}>{alimentoAtivo?.nome}</Text>
               </View>
             </View>
             <TouchableOpacity activeOpacity={0.7} style={styles.fecharBtnHeader} onPress={fecharTrilha}>
@@ -524,7 +612,7 @@ export default function Home() {
               onSalvar={salvarSessao}
               salvando={salvando}
               nomeFilho={filhoAtivo?.nome ?? 'seu pequeno'}
-              alimentoNome={alimentoAtivo?.name ?? 'o alimento'}
+              alimentoNome={alimentoAtivo?.nome ?? 'o alimento'}
               confettiRef={confettiHomeRef}
             />
           </ScrollView>
@@ -591,8 +679,12 @@ const styles = StyleSheet.create({
   subtitulo: { fontSize: 16, color: '#904c1f', lineHeight: 24, marginBottom: 16 },
   badge: { alignSelf: 'flex-start', backgroundColor: '#ffdbc9', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 100, marginBottom: 28, flexDirection: 'row', alignItems: 'center', gap: 6 },
   badgeText: { fontSize: 12, color: '#904c1f', fontWeight: '700' },
-  cardsRow: { flexDirection: 'row', gap: 16, marginBottom: 28 },
-  foodCard: { flex: 1, borderRadius: 28, padding: 18, alignItems: 'center', shadowColor: '#4b4944', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.06, shadowRadius: 32, elevation: 3 },
+  cardsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 28 },
+  loadingBox: { alignItems: 'center', justifyContent: 'center', gap: 12, paddingVertical: 40, marginBottom: 28 },
+  loadingText: { fontSize: 14, color: '#904c1f', textAlign: 'center' },
+  recarregarBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 20, marginBottom: 28, backgroundColor: '#fff5f3', borderRadius: 16, borderWidth: 1.5, borderColor: 'rgba(178,35,0,0.15)' },
+  recarregarText: { fontSize: 15, fontWeight: '700', color: '#b22300' },
+  foodCard: { width: '47%', borderRadius: 28, padding: 18, alignItems: 'center', shadowColor: '#4b4944', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.06, shadowRadius: 32, elevation: 3 },
   cardCategoria: { fontSize: 10, fontWeight: '700', color: '#904c1f', letterSpacing: 1.5, marginBottom: 12, alignSelf: 'flex-start' },
   iconeCircle: { width: (width - 112) / 2, aspectRatio: 1, borderRadius: 999, justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
   cardNome: { fontSize: 15, fontWeight: '800', color: '#1b1c16', textAlign: 'center', marginBottom: 6 },

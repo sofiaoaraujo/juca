@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../../context/FilhosContext';
+import { gerarAnaliseRelatorio, type AnaliseRelatorio } from '../../services/gemini';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 type Sessao = {
@@ -173,10 +174,37 @@ export default function Relatorio() {
   const [nomeUsuario, setNomeUsuario] = useState('');
   const [sessoes] = useState<Sessao[]>(SESSOES_MOCK);
   const [gerandoPDF, setGerandoPDF] = useState(false);
+  const [analise, setAnalise] = useState<AnaliseRelatorio | null>(null);
+  const [carregandoAnalise, setCarregandoAnalise] = useState(false);
+
+  const carregarAnalise = async () => {
+    if (!filhoAtivo?.nome || sessoes.length === 0) return;
+    setCarregandoAnalise(true);
+    try {
+      const resultado = await gerarAnaliseRelatorio(
+        filhoAtivo.nome,
+        sessoes.map(s => ({
+          alimento: s.alimento,
+          textura: s.textura,
+          etapasConcluidas: s.etapasConcluidas,
+          totalEtapas: s.totalEtapas,
+        }))
+      );
+      setAnalise(resultado);
+    } catch (error) {
+      console.error('Erro ao gerar análise:', error);
+    } finally {
+      setCarregandoAnalise(false);
+    }
+  };
 
   useEffect(() => {
     AsyncStorage.getItem('@juca:nomeUsuario').then(v => { if (v) setNomeUsuario(v); });
   }, []);
+
+  useEffect(() => {
+    if (filhoAtivo?.nome) carregarAnalise();
+  }, [filhoAtivo?.nome]);
 
   const nomeFilho = filhoAtivo?.nome ?? '';
   const sexoFilho = filhoAtivo?.sexo ?? '';
@@ -191,16 +219,30 @@ export default function Relatorio() {
   const melhorSessao = sessoes.reduce((a, b) => b.etapasConcluidas.length > a.etapasConcluidas.length ? b : a);
   const conquistasComFoto = sessoes.filter(s => s.fotos && s.fotos.length > 0 && s.etapasConcluidas.includes('comer'));
   const alimentosUnicos = [...new Set(sessoes.map(s => s.alimento))];
-  const padroes = detectarPadroes(sessoes, nomeFilho);
 
   const gerarPDF = async () => {
     setGerandoPDF(true);
     try {
       const hoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
-      const padroesHTML = padroes.map(p => `
-        <div style="display:flex;gap:10px;align-items:flex-start;background:${p.nivel === 'positivo' ? '#f6f4ea' : '#fff5f3'};border-radius:10px;padding:12px;margin-bottom:8px;border-left:4px solid ${p.nivel === 'positivo' ? '#b22300' : '#904c1f'};">
-          <p style="margin:0;font-size:13px;color:#1b1c16;line-height:1.6;">${p.texto}</p>
-        </div>`).join('');
+      const analiseHTML = analise ? `
+        <div class="label">ANÁLISE CLÍNICA</div>
+        <div style="background:#f6f4ea;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #b22300;">
+          <p style="margin:0;font-size:13px;color:#1b1c16;line-height:1.6;">${analise.resumo_clinico}</p>
+        </div>
+        ${analise.padroes_aceitacao.length > 0 ? `
+          <div class="label">PADRÕES IDENTIFICADOS</div>
+          ${analise.padroes_aceitacao.map(p => `
+            <div style="background:#f6f4ea;border-radius:10px;padding:12px;margin-bottom:8px;border-left:4px solid #b22300;">
+              <p style="margin:0;font-size:13px;color:#1b1c16;line-height:1.6;">${p}</p>
+            </div>`).join('')}
+        ` : ''}
+        ${analise.recomendacao ? `
+          <div class="label">RECOMENDAÇÃO</div>
+          <div style="background:#ffdbc9;border-radius:10px;padding:12px;margin-bottom:12px;">
+            <p style="margin:0;font-size:13px;color:#904c1f;line-height:1.6;">${analise.recomendacao}</p>
+          </div>
+        ` : ''}
+      ` : '';
 
       const fotosHTML = conquistasComFoto.length > 0
         ? `<div class="label">REGISTRO FOTOGRÁFICO DAS CONQUISTAS</div>
@@ -256,7 +298,7 @@ export default function Relatorio() {
           <div class="stat"><div class="stat-n">${mediaProgresso}%</div><div class="stat-l">PROGRESSO MÉDIO</div></div>
           <div class="stat"><div class="stat-n">${alimentosUnicos.length}</div><div class="stat-l">ALIMENTOS</div></div>
         </div>
-        ${padroes.length > 0 ? `<div class="label">PADRÕES IDENTIFICADOS</div>${padroesHTML}` : ''}
+        ${analiseHTML}
         ${fotosHTML}
         <div class="label">HISTÓRICO DE SESSÕES</div>
         ${sessoesHTML}
@@ -347,17 +389,46 @@ export default function Relatorio() {
 
         {/* Detalhes para terapeuta — colapsado */}
         <Secao titulo="Detalhes para o Terapeuta" icone="stethoscope">
-          {/* Padrões identificados */}
-          {padroes.length > 0 && (
+          {/* Análise clínica do Gemini */}
+          {carregandoAnalise ? (
+            <View style={styles.analiseLoadingBox}>
+              <MaterialCommunityIcons name="loading" size={20} color="#904c1f" />
+              <Text style={styles.analiseLoadingText}>Gerando análise clínica...</Text>
+            </View>
+          ) : analise ? (
             <>
-              <Text style={styles.detalheLabel}>PADRÕES IDENTIFICADOS</Text>
-              {padroes.map((p, i) => (
-                <View key={i} style={[styles.padraoCard, p.nivel === 'atencao' && styles.padraoCardAtencao]}>
-                  <MaterialCommunityIcons name={p.icone as any} size={16} color={p.nivel === 'positivo' ? '#b22300' : '#904c1f'} />
-                  <Text style={styles.padraoTexto}>{p.texto}</Text>
-                </View>
-              ))}
+              <Text style={styles.detalheLabel}>ANÁLISE CLÍNICA</Text>
+              <View style={styles.analiseBox}>
+                <Text style={styles.analiseResumo}>{analise.resumo_clinico}</Text>
+              </View>
+
+              {analise.padroes_aceitacao.length > 0 && (
+                <>
+                  <Text style={styles.detalheLabel}>PADRÕES IDENTIFICADOS</Text>
+                  {analise.padroes_aceitacao.map((p, i) => (
+                    <View key={i} style={styles.padraoCard}>
+                      <MaterialCommunityIcons name="trending-up" size={16} color="#b22300" />
+                      <Text style={styles.padraoTexto}>{p}</Text>
+                    </View>
+                  ))}
+                </>
+              )}
+
+              {analise.recomendacao ? (
+                <>
+                  <Text style={styles.detalheLabel}>RECOMENDAÇÃO</Text>
+                  <View style={styles.recomendacaoBox}>
+                    <MaterialCommunityIcons name="lightbulb-outline" size={16} color="#904c1f" />
+                    <Text style={styles.recomendacaoTexto}>{analise.recomendacao}</Text>
+                  </View>
+                </>
+              ) : null}
             </>
+          ) : (
+            <TouchableOpacity activeOpacity={0.8} style={styles.analiseRecarregarBox} onPress={carregarAnalise}>
+              <MaterialCommunityIcons name="refresh" size={18} color="#b22300" />
+              <Text style={styles.analiseRecarregarText}>Gerar análise clínica</Text>
+            </TouchableOpacity>
           )}
 
           {/* Dados da criança */}
@@ -472,8 +543,15 @@ const styles = StyleSheet.create({
   semFotoTexto: { fontSize: 13, color: '#5e5c54', textAlign: 'center', lineHeight: 20 },
 
   padraoCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#f6f4ea', borderRadius: 14, padding: 14, marginBottom: 8, borderLeftWidth: 4, borderLeftColor: '#b22300' },
-  padraoCardAtencao: { backgroundColor: '#fff5f3', borderLeftColor: '#904c1f' },
   padraoTexto: { flex: 1, fontSize: 13, color: '#1b1c16', lineHeight: 20 },
+  analiseLoadingBox: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 16, justifyContent: 'center' },
+  analiseLoadingText: { fontSize: 13, color: '#904c1f' },
+  analiseBox: { backgroundColor: '#f6f4ea', borderRadius: 14, padding: 14, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: '#b22300' },
+  analiseResumo: { fontSize: 13, color: '#1b1c16', lineHeight: 22 },
+  recomendacaoBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#ffdbc9', borderRadius: 14, padding: 14, marginBottom: 8 },
+  recomendacaoTexto: { flex: 1, fontSize: 13, color: '#904c1f', lineHeight: 20 },
+  analiseRecarregarBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, backgroundColor: '#fff5f3', borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(178,35,0,0.15)', marginBottom: 16 },
+  analiseRecarregarText: { fontSize: 14, fontWeight: '700', color: '#b22300' },
   dadosBox: { backgroundColor: '#fff5f3', borderRadius: 14, padding: 14, marginBottom: 16, gap: 8 },
   dadosItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   dadosTexto: { flex: 1, fontSize: 13, color: '#1b1c16', lineHeight: 20 },
