@@ -30,7 +30,6 @@ type FilhosContextType = {
 
 const FilhosContext = createContext<FilhosContextType | null>(null);
 
-const STORAGE_KEY = '@juca:filhos';
 const ATIVO_KEY = '@juca:filhoAtivoId';
 
 // Converte "YYYY-MM-DD" → "DD/MM/YYYY"
@@ -54,7 +53,7 @@ function mapearFilho(dados: any): Filho {
   };
 }
 
-// Busca alergias e neuro do filho ativo (opção 2: request por ID)
+// Busca alergias e neuro do filho ativo (request por ID)
 async function buscarDetalhes(id: string): Promise<{ alergias: string; neuro: string }> {
   const [resAlergias, resNeuro] = await Promise.all([
     api.get(`/criancas-alergias/crianca/${id}`),
@@ -121,7 +120,6 @@ export function FilhosProvider({ children }: { children: React.ReactNode }) {
     };
     const novaLista = [...filhos, novo];
     setFilhos(novaLista);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(novaLista));
     await AsyncStorage.setItem(ATIVO_KEY, novo.id);
     setFilhoAtivoState(novo);
     return novo;
@@ -131,7 +129,6 @@ export function FilhosProvider({ children }: { children: React.ReactNode }) {
   const editarFilho = useCallback(async (id: string, dados: Partial<Filho>) => {
     const novaLista = filhos.map(f => f.id === id ? { ...f, ...dados } : f);
     setFilhos(novaLista);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(novaLista));
     if (filhoAtivo?.id === id) {
       const atualizado = novaLista.find(f => f.id === id)!;
       setFilhoAtivoState(atualizado);
@@ -142,7 +139,6 @@ export function FilhosProvider({ children }: { children: React.ReactNode }) {
   const removerFilho = useCallback(async (id: string) => {
     const novaLista = filhos.filter(f => f.id !== id);
     setFilhos(novaLista);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(novaLista));
     if (filhoAtivo?.id === id) {
       const proximo = novaLista[0] ?? null;
       setFilhoAtivoState(proximo);
