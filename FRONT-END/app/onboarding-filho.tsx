@@ -90,7 +90,7 @@ export default function OnboardingFilho() {
         nome: nome,
         data_nascimento: dataFormatada,
         sexo: sexo,
-        cuidador_id: 'de8ea771-326e-470c-a2a3-f2ef5425a53f', // ID mockado por enquanto
+        cuidador_id: '286fc67f-882c-495e-b912-5d199d387761', // ID mockado por enquanto
       });
 
       const criancaId = responseCrianca.data.id;

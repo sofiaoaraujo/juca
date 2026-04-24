@@ -178,18 +178,12 @@ export default function Relatorio() {
   const [carregandoAnalise, setCarregandoAnalise] = useState(false);
 
   const carregarAnalise = async () => {
-    if (!filhoAtivo?.nome || sessoes.length === 0) return;
+    // ✅ Verificação alterada para ID
+    if (!filhoAtivo?.id || sessoes.length === 0) return;
     setCarregandoAnalise(true);
     try {
-      const resultado = await gerarAnaliseRelatorio(
-        filhoAtivo.nome,
-        sessoes.map(s => ({
-          alimento: s.alimento,
-          textura: s.textura,
-          etapasConcluidas: s.etapasConcluidas,
-          totalEtapas: s.totalEtapas,
-        }))
-      );
+      // ✅ Chamada simplificada enviando apenas o ID para o Back-end!
+      const resultado = await gerarAnaliseRelatorio(filhoAtivo.id);
       setAnalise(resultado);
     } catch (error) {
       console.error('Erro ao gerar análise:', error);
@@ -203,8 +197,9 @@ export default function Relatorio() {
   }, []);
 
   useEffect(() => {
-    if (filhoAtivo?.nome) carregarAnalise();
-  }, [filhoAtivo?.nome]);
+    // ✅ Dependency alterada para ID
+    if (filhoAtivo?.id) carregarAnalise();
+  }, [filhoAtivo?.id]);
 
   const nomeFilho = filhoAtivo?.nome ?? '';
   const sexoFilho = filhoAtivo?.sexo ?? '';

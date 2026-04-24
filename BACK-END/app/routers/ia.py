@@ -1,12 +1,18 @@
 from fastapi import APIRouter, HTTPException
 from app.database import supabase
-import google.generativeai as genai
 import os
+import json
+import requests
+from dotenv import load_dotenv
+
+# 1. Carrega as variáveis do arquivo .env
+load_dotenv()
 
 router = APIRouter(prefix="/ia", tags=["Inteligência Artificial"])
 
-# O modelo é instanciado uma vez para alta performance
-model = genai.GenerativeModel('gemini-1.5-flash')
+# 2. Configura a URL direta usando um modelo ATUAL (gemini-2.5-flash) na rota v1beta
+CHAVE_API = os.getenv("GEMINI_API_KEY", "").strip()
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={CHAVE_API}"
 
 # ---------------------------------------------------------------------------
 # Motor de Food Chaining (Sugestões para Home)
@@ -14,12 +20,10 @@ model = genai.GenerativeModel('gemini-1.5-flash')
 @router.post("/sugestao-food-chaining/{crianca_id}")
 async def obter_sugestao(crianca_id: str):
     try:
-        # 1. Busca alergias (proibidos)
+        # Busca dados no Supabase
         alergias_data = supabase.table("crianca_alergia").select("alergias(nome)").eq("crianca_id", crianca_id).execute()
         alergias_lista = [item['alergias']['nome'] for item in alergias_data.data if item.get('alergias')]
 
-        # 2. Busca alimentos que a criança JÁ ACEITA (status 'Aceita')
-        # Usamos o progresso.py como base de dados real
         historico_sucesso = (
             supabase.table("crianca_alimento")
             .select("alimentos(id, nome, textura, cor, sabor)")
@@ -29,31 +33,57 @@ async def obter_sugestao(crianca_id: str):
         )
         alimentos_aceitos = [h['alimentos'] for h in historico_sucesso.data if h.get('alimentos')]
 
-        # 3. Busca Catálogo Completo
         catalogo = supabase.table("alimentos").select("id, nome, textura, cor, sabor").execute()
 
-        # 4. Prompt de Food Chaining (lógica sensorial)
         prompt = f"""
-        Você é um nutricionista especialista em Food Chaining.
-        - Alimentos que a criança JÁ ACEITA: {alimentos_aceitos}
-        - Alimentos PROIBIDOS (Alergias): {alergias_lista}
-        - Catálogo completo: {catalogo.data}
-        
-        Sua tarefa: Aplique o método Food Chaining. Sugira 2 alimentos do catálogo que a criança 
-        ainda não come, mas que possuem textura, cor ou sabor similares aos que ela já aceita.
-        
-        Retorne estritamente um JSON:
-        {{"sugestoes": [{{"id": "uuid", "nome": "nome", "motivo": "conexão sensorial"}}, ...]}}
+        Você é um nutricionista especialista em Food Chaining para crianças com dificuldades alimentares.
+
+        Dados da criança:
+        - Alergias/Restrições: {alergias_lista}
+        - Alimentos que já aceita: {alimentos_aceitos}
+        - Catálogo de onde você DEVE escolher os novos alimentos: {catalogo.data}
+
+        Sua tarefa: Sugira exatamente 2 alimentos do catálogo que a criança ainda não come, mas que possuem similaridade sensorial com os aceitos.
+
+        Retorne SOMENTE um JSON válido:
+        {{
+          "sugestoes": [
+            {{
+              "id": "ID do alimento no catálogo",
+              "nome": "nome do alimento",
+              "motivo": "conexão sensorial curta",
+              "categoria": "Fruta | Legume | Verdura | Proteína | Carboidrato | Laticínio",
+              "textura": "macio | crocante | cremoso | firme",
+              "cor": "cor predominante"
+            }}
+          ]
+        }}
         """
 
-        response = model.generate_content(
-            prompt, 
-            generation_config={"response_mime_type": "application/json"}
-        )
+        # Monta o pacote de dados para o Google
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.4
+            }
+        }
+
+        # Envia a requisição direto pela internet
+        response = requests.post(GEMINI_URL, json=payload, headers={"Content-Type": "application/json"})
         
-        return response.text
+        # Se o Google der erro, isso vai mostrar no terminal
+        response.raise_for_status()
+        
+        # Extrai o texto da resposta
+        dados = response.json()
+        texto = dados['candidates'][0]['content']['parts'][0]['text']
+        
+        # Limpeza e retorno
+        texto_limpo = texto.strip().replace("```json", "").replace("```", "").strip()
+        return json.loads(texto_limpo)
 
     except Exception as e:
+        print(f"Erro detalhado no Food Chaining: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao processar Food Chaining: {str(e)}")
 
 # ---------------------------------------------------------------------------
@@ -62,7 +92,6 @@ async def obter_sugestao(crianca_id: str):
 @router.post("/analise-relatorio/{crianca_id}")
 async def gerar_analise_relatorio(crianca_id: str):
     try:
-        # Busca todo o progresso (Trilha ABA)
         progresso_data = supabase.table("crianca_alimento") \
             .select("*, alimentos(nome, textura, cor, sabor)") \
             .eq("crianca_id", crianca_id) \
@@ -74,17 +103,32 @@ async def gerar_analise_relatorio(crianca_id: str):
         ]
 
         prompt = f"""
-        Analise o histórico abaixo de um paciente em terapia alimentar (ABA): {historico_formatado}.
-        Identifique padrões de estagnação ou evolução nas texturas.
-        Retorne JSON: {{"resumo_clinico": "...", "padroes_aceitacao": [], "recomendacao": "..."}}
+        Analise o histórico de terapia alimentar (ABA): {historico_formatado}.
+        Identifique padrões de evolução nas texturas.
+        Retorne SOMENTE um JSON válido:
+        {{
+            "resumo_clinico": "resumo do progresso",
+            "padroes_aceitacao": ["padrão 1", "padrão 2"],
+            "recomendacao": "próximo passo"
+        }}
         """
 
-        response = model.generate_content(
-            prompt, 
-            generation_config={"response_mime_type": "application/json"}
-        )
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.3
+            }
+        }
+
+        response = requests.post(GEMINI_URL, json=payload, headers={"Content-Type": "application/json"})
+        response.raise_for_status()
         
-        return response.text
+        dados = response.json()
+        texto = dados['candidates'][0]['content']['parts'][0]['text']
+        
+        texto_limpo = texto.strip().replace("```json", "").replace("```", "").strip()
+        return json.loads(texto_limpo)
 
     except Exception as e:
+        print(f"Erro detalhado no Relatório: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao gerar relatório: {str(e)}")
