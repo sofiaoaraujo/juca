@@ -186,3 +186,33 @@ async def atualizar_crianca(crianca_id: UUID, payload: CriancaUpdate):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao atualizar criança: {str(e)}",
         )
+
+#----------------------------------------------------------------------------
+# DELETE /criancas/{crianca_id} — Excluir uma criança
+#----------------------------------------------------------------------------
+
+@router.delete(
+    "/{crianca_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remover uma criança",
+)
+async def remover_crianca(crianca_id: UUID):
+    try:
+        resposta = (
+            supabase.table("criancas")
+            .delete()
+            .eq("id", str(crianca_id))
+            .execute()
+        )
+        if not resposta.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Criança com ID '{crianca_id}' não encontrada.",
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao remover criança: {str(e)}",
+        )

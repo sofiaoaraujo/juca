@@ -53,10 +53,10 @@ function mapearFilho(dados: any): Filho {
   };
 }
 
-// Busca alergias e neuro do filho ativo (request por ID)
-async function buscarDetalhes(id: string): Promise<{ alergias: string; neuro: string }> {
+// Busca alergias e neuro do filho ativo (request por ID)// ! Pode pensar substituir por join algumas partes para otimizar
+async function buscarDetalhes(id: string): Promise<{ alergias: string; neuro: string }> {  
   const [resAlergias, resNeuro] = await Promise.all([
-    api.get(`/criancas-alergias/crianca/${id}`),
+    api.get(`/criancas-alergias/crianca/${id}`),            
     api.get(`/criancas-neurodivergencias/${id}`),
   ]);
 
@@ -111,7 +111,8 @@ export function FilhosProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
 
-  // Adicionar filho
+  // Adicionar filho // ! MODIFICAR DEPOIS, PROCURAR REMOVER ISSO E TROCAR POR REQUISIÇÃO POST PRA API, AQUI É SÓ PROTOTIPO RÁPIDO
+                    // ! E TIRAR O POST DO INDEX, TORNAR AQUI PORTANTO O ÚNICO LUGAR RESPONSÁVEL POR ADICIONAR FILHOS, PARA CENTRALIZAR A LÓGICA DE ATUALIZAÇÃO DO CONTEXTO 
   const adicionarFilho = useCallback(async (dados: Omit<Filho, 'id' | 'criadoEm'>) => {
     const novo: Filho = {
       ...dados,
@@ -137,15 +138,10 @@ export function FilhosProvider({ children }: { children: React.ReactNode }) {
 
   // Remover filho
   const removerFilho = useCallback(async (id: string) => {
-    const novaLista = filhos.filter(f => f.id !== id);
-    setFilhos(novaLista);
-    if (filhoAtivo?.id === id) {
-      const proximo = novaLista[0] ?? null;
-      setFilhoAtivoState(proximo);
-      if (proximo) await AsyncStorage.setItem(ATIVO_KEY, proximo.id);
-      else await AsyncStorage.removeItem(ATIVO_KEY);
-    }
-  }, [filhos, filhoAtivo]);
+    await api.delete(`/criancas/${id}`);
+    await recarregar();
+  }, [recarregar]);
+
 
   return (
     <FilhosContext.Provider value={{

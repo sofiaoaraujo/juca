@@ -1,5 +1,4 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import React, { useEffect, useState } from 'react';
@@ -15,6 +14,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../../context/FilhosContext';
+import api from '../../services/api';
+
+// TODO: login
+const DEV_CUIDADOR_ID = 'de8ea771-326e-470c-a2a3-f2ef5425a53f';
+
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 type Sessao = {
@@ -175,7 +179,9 @@ export default function Relatorio() {
   const [gerandoPDF, setGerandoPDF] = useState(false);
 
   useEffect(() => {
-    AsyncStorage.getItem('@juca:nomeUsuario').then(v => { if (v) setNomeUsuario(v); });
+    api.get(`/usuarios/${DEV_CUIDADOR_ID}`)
+      .then(r => setNomeUsuario(r.data.nome))
+      .catch(() => {});
   }, []);
 
   const nomeFilho = filhoAtivo?.nome ?? '';

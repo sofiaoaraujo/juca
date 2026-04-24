@@ -44,7 +44,7 @@ const ALIMENTOS = [
 
 export default function OnboardingFilho() {
   const router = useRouter();
-  const { adicionarFilho } = useFilhos();
+  const { recarregar } = useFilhos();
 
   const [step, setStep] = useState(0);
   const [nome, setNome] = useState('');
@@ -156,15 +156,8 @@ export default function OnboardingFilho() {
         }
       }
 
-      // 5. SALVAR NO CONTEXTO LOCAL E REDIRECIONAR
-      await adicionarFilho({
-        nome,
-        dataNasc,
-        sexo,
-        alergias,
-        neuro: neuro.join(', '), // Transforma o array em texto pro contexto visual do App
-        alimentosSelecionados,
-      });
+      // 5. RECARREGAR FILHOS NO CONTEXTO PARA INCLUIR O NOVO FILHO CRIADO
+      await recarregar(); // Recarrega os filhos do contexto para incluir o novo filho criado
 
       router.replace('/(tabs)/home');
 
