@@ -68,7 +68,7 @@ async function buscarDetalhes(id: string): Promise<{ alergias: string; neuro: st
 
   const neuroNomes = await Promise.all(
     resNeuro.data.map((n: any) =>
-      api.get(`/neurodivergencias/${n.neurodivergencia_id}`).then(r => r.data.nome)
+      api.get(`/neurodivergencias/${n.neurodivergencia_id}`).then(r => r.data.neurodivergencia)
     )
   );
   const neuro = neuroNomes.join(', ');
