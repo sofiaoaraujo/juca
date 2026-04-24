@@ -14,6 +14,7 @@ import {
 import MaskInput from 'react-native-mask-input';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../context/FilhosContext';
+import api from '../services/api'; // <-- IMPORTAÇÃO DA API AQUI
 
 const dataMask = [/\d/, /\d/, '/', /\d/, /\d/, '/', /\d/, /\d/, /\d/, /\d/];
 const { width } = Dimensions.get('window');
@@ -50,7 +51,7 @@ export default function OnboardingFilho() {
   const [dataNasc, setDataNasc] = useState('');
   const [sexo, setSexo] = useState('');
   const [alergias, setAlergias] = useState('');
-  const [neuro, setNeuro] = useState<string[]>([]);
+  const [neuro, setNeuro] = useState<string[]>([]); // <-- Agora é um Array
   const [alimentosSelecionados, setAlimentosSelecionados] = useState<string[]>([]);
   const [salvando, setSalvando] = useState(false);
 
@@ -82,17 +83,94 @@ export default function OnboardingFilho() {
   const handleFinalizar = async () => {
     setSalvando(true);
     try {
+      // 1. CRIAR A CRIANÇA
+      const dataFormatada = dataNasc.split('/').reverse().join('-');
+
+      const responseCrianca = await api.post('/criancas/', {
+        nome: nome,
+        data_nascimento: dataFormatada,
+        sexo: sexo,
+        cuidador_id: 'de8ea771-326e-470c-a2a3-f2ef5425a53f', // ID mockado por enquanto
+      });
+
+      const criancaId = responseCrianca.data.id;
+
+      // 2. VINCULAR NEURODIVERGÊNCIAS (AGORA TRATA O ARRAY MÚLTIPLO)
+      if (neuro && neuro.length > 0 && !neuro.includes('Nenhuma')) {
+        const respNeuro = await api.get('/neurodivergencias/');
+        
+        for (const neuroTexto of neuro) {
+          const neuroEncontrada = respNeuro.data.find(
+            (n: any) => n.neurodivergencia.toLowerCase() === neuroTexto.toLowerCase()
+          );
+
+          if (neuroEncontrada) {
+            await api.post('/criancas-neurodivergencias/', {
+              crianca_id: criancaId,
+              neurodivergencia_id: neuroEncontrada.id,
+            });
+          }
+        }
+      }
+
+      // 3. VINCULAR ALERGIAS (CRIANDO AS QUE NÃO EXISTEM)
+      if (alergias && alergias.trim() !== '') {
+        const respAlergias = await api.get('/alergias/');
+        const alergiasExistentes = respAlergias.data;
+        const alergiasDigitadas = alergias.split(',').map(a => a.trim());
+
+        for (const alergiaTexto of alergiasDigitadas) {
+          if (!alergiaTexto) continue;
+
+          let alergiaId = null;
+          const alergiaEncontrada = alergiasExistentes.find(
+            (a: any) => a.nome.toLowerCase() === alergiaTexto.toLowerCase()
+          );
+
+          if (alergiaEncontrada) {
+            alergiaId = alergiaEncontrada.id;
+          } else {
+            const novaAlergia = await api.post('/alergias/', { nome: alergiaTexto });
+            alergiaId = novaAlergia.data.id;
+          }
+
+          if (alergiaId) {
+            await api.post('/criancas-alergias/', {
+              crianca_id: criancaId,
+              alergia_id: alergiaId,
+            });
+          }
+        }
+      }
+
+      // 4. VINCULAR ALIMENTOS INICIAIS
+      const alimentosDB = await api.get('/alimentos/');
+      for (const nomeAlimento of alimentosSelecionados) {
+        const alimento = alimentosDB.data.find((a: any) => a.nome === nomeAlimento);
+        if (alimento) {
+          await api.post('/progresso/', {
+            crianca_id: criancaId,
+            alimento_id: alimento.id,
+            status: 'Aceita',
+          });
+        }
+      }
+
+      // 5. SALVAR NO CONTEXTO LOCAL E REDIRECIONAR
       await adicionarFilho({
         nome,
         dataNasc,
         sexo,
         alergias,
-        neuro: neuro.join(', '),
+        neuro: neuro.join(', '), // Transforma o array em texto pro contexto visual do App
         alimentosSelecionados,
       });
+
       router.replace('/(tabs)/home');
-    } catch (error) {
-      Alert.alert('Erro', 'Não foi possível salvar. Tente novamente.');
+
+    } catch (error: any) {
+      console.error('Erro ao salvar no back-end:', error?.response?.data || error.message);
+      Alert.alert('Erro', 'Não foi possível salvar os dados no servidor. Verifique a conexão.');
     } finally {
       setSalvando(false);
     }

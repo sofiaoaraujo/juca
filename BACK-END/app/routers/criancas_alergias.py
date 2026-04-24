@@ -9,7 +9,7 @@ from app.database import supabase
 from app.schemas.crianca_alergia import CriancaAlergiaCreate,CriancaAlergiaResponse,CriancaAlergiaComDetalhesResponse
 
 
-router = APIRouter(prefix="/crianca-alergia", tags=["Criança x Alergia"])
+router = APIRouter(prefix="/criancas-alergias", tags=["Criança x Alergia"])
 
 # ---------------------------------------------------------------------------
 # GET /crianca-alergia/crianca/{crianca_id} — Listar alergias de uma criança
