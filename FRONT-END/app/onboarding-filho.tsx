@@ -14,6 +14,7 @@ import {
 import MaskInput from 'react-native-mask-input';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../context/FilhosContext';
+import api from '../services/api'; // <-- IMPORTAÇÃO DA API AQUI
 
 const dataMask = [/\d/, /\d/, '/', /\d/, /\d/, '/', /\d/, /\d/, /\d/, /\d/];
 const { width } = Dimensions.get('window');
@@ -50,11 +51,11 @@ export default function OnboardingFilho() {
   const [dataNasc, setDataNasc] = useState('');
   const [sexo, setSexo] = useState('');
   const [alergias, setAlergias] = useState('');
-  const [neuro, setNeuro] = useState('');
+  const [neuro, setNeuro] = useState<string[]>([]); // <-- Agora é um Array
   const [alimentosSelecionados, setAlimentosSelecionados] = useState<string[]>([]);
   const [salvando, setSalvando] = useState(false);
 
-  const totalSteps = 5;
+  const totalSteps = 6;
   const nextStep = () => setStep(s => s + 1);
   const prevStep = () => setStep(s => Math.max(0, s - 1));
 
@@ -66,20 +67,110 @@ export default function OnboardingFilho() {
     );
   };
 
+  const toggleNeuro = (opcao: string) => {
+    if (opcao === 'Nenhuma') {
+      setNeuro(['Nenhuma']);
+      return;
+    }
+    setNeuro(prev => {
+      const semNenhuma = prev.filter(n => n !== 'Nenhuma');
+      return semNenhuma.includes(opcao)
+        ? semNenhuma.filter(n => n !== opcao)
+        : [...semNenhuma, opcao];
+    });
+  };
+
   const handleFinalizar = async () => {
     setSalvando(true);
     try {
+      // 1. CRIAR A CRIANÇA
+      const dataFormatada = dataNasc.split('/').reverse().join('-');
+
+      const responseCrianca = await api.post('/criancas/', {
+        nome: nome,
+        data_nascimento: dataFormatada,
+        sexo: sexo,
+        cuidador_id: 'de8ea771-326e-470c-a2a3-f2ef5425a53f', // ID mockado por enquanto
+      });
+
+      const criancaId = responseCrianca.data.id;
+
+      // 2. VINCULAR NEURODIVERGÊNCIAS (AGORA TRATA O ARRAY MÚLTIPLO)
+      if (neuro && neuro.length > 0 && !neuro.includes('Nenhuma')) {
+        const respNeuro = await api.get('/neurodivergencias/');
+        
+        for (const neuroTexto of neuro) {
+          const neuroEncontrada = respNeuro.data.find(
+            (n: any) => n.neurodivergencia.toLowerCase() === neuroTexto.toLowerCase()
+          );
+
+          if (neuroEncontrada) {
+            await api.post('/criancas-neurodivergencias/', {
+              crianca_id: criancaId,
+              neurodivergencia_id: neuroEncontrada.id,
+            });
+          }
+        }
+      }
+
+      // 3. VINCULAR ALERGIAS (CRIANDO AS QUE NÃO EXISTEM)
+      if (alergias && alergias.trim() !== '') {
+        const respAlergias = await api.get('/alergias/');
+        const alergiasExistentes = respAlergias.data;
+        const alergiasDigitadas = alergias.split(',').map(a => a.trim());
+
+        for (const alergiaTexto of alergiasDigitadas) {
+          if (!alergiaTexto) continue;
+
+          let alergiaId = null;
+          const alergiaEncontrada = alergiasExistentes.find(
+            (a: any) => a.nome.toLowerCase() === alergiaTexto.toLowerCase()
+          );
+
+          if (alergiaEncontrada) {
+            alergiaId = alergiaEncontrada.id;
+          } else {
+            const novaAlergia = await api.post('/alergias/', { nome: alergiaTexto });
+            alergiaId = novaAlergia.data.id;
+          }
+
+          if (alergiaId) {
+            await api.post('/criancas-alergias/', {
+              crianca_id: criancaId,
+              alergia_id: alergiaId,
+            });
+          }
+        }
+      }
+
+      // 4. VINCULAR ALIMENTOS INICIAIS
+      const alimentosDB = await api.get('/alimentos/');
+      for (const nomeAlimento of alimentosSelecionados) {
+        const alimento = alimentosDB.data.find((a: any) => a.nome === nomeAlimento);
+        if (alimento) {
+          await api.post('/progresso/', {
+            crianca_id: criancaId,
+            alimento_id: alimento.id,
+            status: 'Aceita',
+          });
+        }
+      }
+
+      // 5. SALVAR NO CONTEXTO LOCAL E REDIRECIONAR
       await adicionarFilho({
         nome,
         dataNasc,
         sexo,
         alergias,
-        neuro,
+        neuro: neuro.join(', '), // Transforma o array em texto pro contexto visual do App
         alimentosSelecionados,
       });
+
       router.replace('/(tabs)/home');
-    } catch (error) {
-      Alert.alert('Erro', 'Não foi possível salvar. Tente novamente.');
+
+    } catch (error: any) {
+      console.error('Erro ao salvar no back-end:', error?.response?.data || error.message);
+      Alert.alert('Erro', 'Não foi possível salvar os dados no servidor. Verifique a conexão.');
     } finally {
       setSalvando(false);
     }
@@ -176,35 +267,51 @@ export default function OnboardingFilho() {
     </SafeAreaView>
   );
 
-  // Step 3 — Alergias e neuro
+  // Step 3 — Alergias
   if (step === 3) return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
-      <Text style={styles.questionText}>Alguma restrição ou condição especial?</Text>
-      <View style={[styles.inputBlock, { marginBottom: 20 }]}>
+      <Text style={styles.questionText}>Alguma alergia alimentar?</Text>
+      <Text style={styles.questionSub}>Opcional — liste as alergias conhecidas</Text>
+      <View style={styles.inputBlock}>
         <TextInput
-          style={styles.textInput}
-          placeholder="Alergias (Opcional)"
+          style={[styles.textInput, { minHeight: 80, textAlignVertical: 'top' }]}
+          placeholder="Ex: Amendoim, Lactose, Glúten..."
           placeholderTextColor="#5e5c5480"
           value={alergias}
           onChangeText={setAlergias}
+          multiline
         />
-      </View>
-      <View style={styles.inputBlock}>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Neurodivergência (Opcional)"
-          placeholderTextColor="#5e5c5480"
-          value={neuro}
-          onChangeText={setNeuro}
-        />
-        <MaterialCommunityIcons name="brain" size={20} color="#904c1f" />
       </View>
       <ArrowButton onPress={nextStep} />
     </SafeAreaView>
   );
 
-  // Step 4 — Alimentos
+  // Step 4 — Neurodivergência
+  if (step === 4) return (
+    <SafeAreaView style={styles.fullScreen}>
+      <Header />
+      <Text style={styles.questionText}>Alguma neurodivergência?</Text>
+      <Text style={styles.questionSub}>Opcional — selecione todas que se aplicam</Text>
+      <View style={styles.optionsGrid}>
+        {['TEA', 'TDAH', 'Transtorno de Ansiedade', 'TARE', 'Outra', 'Nenhuma'].map((opcao) => (
+          <TouchableOpacity
+            key={opcao}
+            activeOpacity={0.7}
+            style={[styles.neuroBtn, neuro.includes(opcao) && styles.neuroBtnActive]}
+            onPress={() => toggleNeuro(opcao)}
+          >
+            <Text style={[styles.neuroText, neuro.includes(opcao) && styles.neuroTextActive]}>
+              {opcao}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <ArrowButton onPress={nextStep} />
+    </SafeAreaView>
+  );
+
+  // Step 5 — Alimentos
   return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
@@ -258,6 +365,12 @@ const styles = StyleSheet.create({
   progressContainer: { flex: 1, height: 6, backgroundColor: '#e4e3d9', borderRadius: 3, overflow: 'hidden' },
   progressBar: { height: '100%', backgroundColor: '#b22300' },
   questionText: { fontSize: 32, fontWeight: '800', color: '#1b1c16', marginBottom: 30 },
+  questionSub: { fontSize: 14, color: '#5e5c54', marginBottom: 20, marginTop: -20 },
+  optionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  neuroBtn: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 100, backgroundColor: '#fff', borderWidth: 2, borderColor: '#e4e3d9', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 1 },
+  neuroBtnActive: { backgroundColor: '#b22300', borderColor: '#b22300' },
+  neuroText: { fontSize: 15, fontWeight: '600', color: '#1b1c16' },
+  neuroTextActive: { color: '#fff' },
   inputBlock: { backgroundColor: '#eae8de', borderRadius: 20, padding: 22, flexDirection: 'row', alignItems: 'center' },
   textInput: { flex: 1, fontSize: 18, color: '#1b1c16', fontWeight: '500' },
   fab: { position: 'absolute', bottom: 40, right: 30, width: 70, height: 70, borderRadius: 35, backgroundColor: '#b22300', justifyContent: 'center', alignItems: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 4 },
