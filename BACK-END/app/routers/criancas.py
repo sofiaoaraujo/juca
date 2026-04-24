@@ -39,6 +39,30 @@ async def listar_criancas():
 
 
 # ---------------------------------------------------------------------------
+# GET /criancas/cuidador/{cuidador_id} — Listar crianças de um cuidador
+# ---------------------------------------------------------------------------
+@router.get(
+    "/cuidador/{cuidador_id}",
+    response_model=List[CriancaResponse],
+    summary="Listar crianças de um cuidador",
+)
+async def listar_criancas_por_cuidador(cuidador_id: UUID):
+    try:
+        resposta = (
+            supabase.table("criancas")
+            .select("*")
+            .eq("cuidador_id", str(cuidador_id))
+            .execute()
+        )
+        return resposta.data
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao buscar crianças do cuidador: {str(e)}",
+        )
+
+# ---------------------------------------------------------------------------
 # GET /criancas/{crianca_id} — Buscar criança por ID
 # ---------------------------------------------------------------------------
 @router.get(
@@ -69,7 +93,7 @@ async def buscar_crianca(crianca_id: UUID):
         return resposta.data
 
     except HTTPException:
-        raise  # Re-lança HTTPExceptions sem encapsular
+        raise  # Re-lança HTTPExceptions sem encapsular, serve para 404 e outros erros específicos
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
