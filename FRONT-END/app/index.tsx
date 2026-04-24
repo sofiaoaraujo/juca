@@ -9,37 +9,60 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 import MaskInput from 'react-native-mask-input';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../context/FilhosContext';
-import api from '../services/api';
+import api from '../services/api'; // <-- IMPORTAÇÃO DA API AQUI
 
 const dataMask = [/\d/, /\d/, '/', /\d/, /\d/, '/', /\d/, /\d/, /\d/, /\d/];
-
 const { width } = Dimensions.get('window');
 
-export default function JucaOnboarding() {
+const ALIMENTOS = [
+  { name: 'Banana', icon: 'fruit-cherries', color: '#FFF9C4' },
+  { name: 'Maçã', icon: 'food-apple', color: '#FFEBEE' },
+  { name: 'Mamão', icon: 'fruit-pineapple', color: '#FFE0B2' },
+  { name: 'Manga', icon: 'fruit-grapes', color: '#FFF3E0' },
+  { name: 'Melancia', icon: 'fruit-watermelon', color: '#FCE4EC' },
+  { name: 'Cenoura', icon: 'carrot', color: '#FFF3E0' },
+  { name: 'Brócolis', icon: 'sprout', color: '#E8F5E9' },
+  { name: 'Abobrinha', icon: 'leaf', color: '#F1F8E9' },
+  { name: 'Beterraba', icon: 'circle-slice-8', color: '#FCE4EC' },
+  { name: 'Chuchu', icon: 'leaf-circle-outline', color: '#F0F4C3' },
+  { name: 'Arroz', icon: 'rice', color: '#F5F5F5' },
+  { name: 'Batata', icon: 'pot-steam-outline', color: '#FFF8E1' },
+  { name: 'Batata-Doce', icon: 'nutrition', color: '#FFE0B2' },
+  { name: 'Macarrão', icon: 'pasta', color: '#FFF9C4' },
+  { name: 'Mandioca', icon: 'corn', color: '#FFFDE7' },
+  { name: 'Feijão', icon: 'seed', color: '#EFEBE9' },
+  { name: 'Ovo', icon: 'egg', color: '#FFFDE7' },
+  { name: 'Frango', icon: 'food-drumstick', color: '#FBE9E7' },
+  { name: 'Carne Moída', icon: 'food-steak', color: '#FFEBEE' },
+  { name: 'Inhame', icon: 'mushroom-outline', color: '#F3E5F5' },
+];
+
+export default function OnboardingFilho() {
   const router = useRouter();
   const { adicionarFilho } = useFilhos();
+
   const [step, setStep] = useState(0);
   const [nome, setNome] = useState('');
   const [dataNasc, setDataNasc] = useState('');
   const [sexo, setSexo] = useState('');
   const [alergias, setAlergias] = useState('');
-  const [neuro, setNeuro] = useState<string[]>([]);
+  const [neuro, setNeuro] = useState<string[]>([]); // <-- Agora é um Array
   const [alimentosSelecionados, setAlimentosSelecionados] = useState<string[]>([]);
   const [salvando, setSalvando] = useState(false);
 
   const totalSteps = 6;
-  const nextStep = () => setStep(step + 1);
-  const prevStep = () => setStep(Math.max(0, step - 1));
+  const nextStep = () => setStep(s => s + 1);
+  const prevStep = () => setStep(s => Math.max(0, s - 1));
 
   const toggleAlimento = (nomeAlimento: string) => {
     setAlimentosSelecionados(prev =>
       prev.includes(nomeAlimento)
-        ? prev.filter(item => item !== nomeAlimento)
+        ? prev.filter(i => i !== nomeAlimento)
         : [...prev, nomeAlimento]
     );
   };
@@ -60,92 +83,114 @@ export default function JucaOnboarding() {
   const handleFinalizar = async () => {
     setSalvando(true);
     try {
+      // 1. CRIAR A CRIANÇA
+      const dataFormatada = dataNasc.split('/').reverse().join('-');
+
+      const responseCrianca = await api.post('/criancas/', {
+        nome: nome,
+        data_nascimento: dataFormatada,
+        sexo: sexo,
+        cuidador_id: 'de8ea771-326e-470c-a2a3-f2ef5425a53f', // ID mockado por enquanto
+      });
+
+      const criancaId = responseCrianca.data.id;
+
+      // 2. VINCULAR NEURODIVERGÊNCIAS (AGORA TRATA O ARRAY MÚLTIPLO)
+      if (neuro && neuro.length > 0 && !neuro.includes('Nenhuma')) {
+        const respNeuro = await api.get('/neurodivergencias/');
+        
+        for (const neuroTexto of neuro) {
+          const neuroEncontrada = respNeuro.data.find(
+            (n: any) => n.neurodivergencia.toLowerCase() === neuroTexto.toLowerCase()
+          );
+
+          if (neuroEncontrada) {
+            await api.post('/criancas-neurodivergencias/', {
+              crianca_id: criancaId,
+              neurodivergencia_id: neuroEncontrada.id,
+            });
+          }
+        }
+      }
+
+      // 3. VINCULAR ALERGIAS (CRIANDO AS QUE NÃO EXISTEM)
+      if (alergias && alergias.trim() !== '') {
+        const respAlergias = await api.get('/alergias/');
+        const alergiasExistentes = respAlergias.data;
+        const alergiasDigitadas = alergias.split(',').map(a => a.trim());
+
+        for (const alergiaTexto of alergiasDigitadas) {
+          if (!alergiaTexto) continue;
+
+          let alergiaId = null;
+          const alergiaEncontrada = alergiasExistentes.find(
+            (a: any) => a.nome.toLowerCase() === alergiaTexto.toLowerCase()
+          );
+
+          if (alergiaEncontrada) {
+            alergiaId = alergiaEncontrada.id;
+          } else {
+            const novaAlergia = await api.post('/alergias/', { nome: alergiaTexto });
+            alergiaId = novaAlergia.data.id;
+          }
+
+          if (alergiaId) {
+            await api.post('/criancas-alergias/', {
+              crianca_id: criancaId,
+              alergia_id: alergiaId,
+            });
+          }
+        }
+      }
+
+      // 4. VINCULAR ALIMENTOS INICIAIS
+      const alimentosDB = await api.get('/alimentos/');
+      for (const nomeAlimento of alimentosSelecionados) {
+        const alimento = alimentosDB.data.find((a: any) => a.nome === nomeAlimento);
+        if (alimento) {
+          await api.post('/progresso/', {
+            crianca_id: criancaId,
+            alimento_id: alimento.id,
+            status: 'Aceita',
+          });
+        }
+      }
+
+      // 5. SALVAR NO CONTEXTO LOCAL E REDIRECIONAR
       await adicionarFilho({
         nome,
         dataNasc,
         sexo,
         alergias,
-        neuro: neuro.join(', '),
+        neuro: neuro.join(', '), // Transforma o array em texto pro contexto visual do App
         alimentosSelecionados,
       });
 
-      // ✅ Salvar no banco de dados aqui , CONEXÃO COM BACK-END
-
-      //Busca todos os alimentos do banco para mapear nome → id
-      const alimentosDB = await api.get('/alimentos/');
-
-      const response = await api.post('/criancas/', {
-        nome: nome,
-        data_nascimento: dataNasc.split('/').reverse().join('-'), // Converte de DD/MM/AAAA para AAAA-MM-DD
-        cuidador_id: 'b594dcf7-51ee-405a-9fb4-eb60befd19f9', // Substitua pelo ID real do cuidador, que deve ser obtido após o login ou cadastro do responsável (ANALISAR ESSA PARTE DEPOIS)**
-        sexo: sexo
-      });
-
-      const criancaDaAPI = response.data; // O objeto retornado pelo backend após criar a criança
-      const criancaId = criancaDaAPI.id; // ID retornado pelo backend
-
-      // Salva cada alimento vinculado à criança
-      for (const nomeAlimento of alimentosSelecionados) {
-        const alimento = alimentosDB.data.find((a: any) => a.nome === nomeAlimento);
-        if (alimento) {
-          await api.post('/progresso/', {    // ! É progresso mesmo, não mude
-            crianca_id: criancaId,
-            alimento_id: alimento.id,
-            status: 'Aceita',               // * PODE MUDAR DEPOIS, DEPENDE DE COMO VAMOS GERENCIAR ESSA PARTE DE ACEITO/RECUSADO/NEUTRO
-          });
-        }
-      }
-
       router.replace('/(tabs)/home');
+
     } catch (error: any) {
-      console.error('Erro ao salvar:', error);
-      console.error('Detalhes do erro:', error?.response?.data);
-      Alert.alert('Erro', 'Não foi possível salvar os dados. Tente novamente.');
+      console.error('Erro ao salvar no back-end:', error?.response?.data || error.message);
+      Alert.alert('Erro', 'Não foi possível salvar os dados no servidor. Verifique a conexão.');
     } finally {
       setSalvando(false);
     }
   };
 
-  const alimentos = [
-    // FRUTAS
-    { name: 'Banana', icon: 'fruit-cherries', color: '#FFF9C4' },
-    { name: 'Maçã', icon: 'food-apple', color: '#FFEBEE' },
-    { name: 'Mamão', icon: 'fruit-pineapple', color: '#FFE0B2' },
-    { name: 'Manga', icon: 'fruit-grapes', color: '#FFF3E0' },
-    { name: 'Melancia', icon: 'fruit-watermelon', color: '#FCE4EC' },
-    // VERDURAS E LEGUMES
-    { name: 'Cenoura', icon: 'carrot', color: '#FFF3E0' },
-    { name: 'Brócolis', icon: 'sprout', color: '#E8F5E9' },
-    { name: 'Abobrinha', icon: 'leaf', color: '#F1F8E9' },
-    { name: 'Beterraba', icon: 'circle-slice-8', color: '#FCE4EC' },
-    { name: 'Chuchu', icon: 'leaf-circle-outline', color: '#F0F4C3' },
-    // CARBOIDRATOS
-    { name: 'Arroz', icon: 'rice', color: '#F5F5F5' },
-    { name: 'Batata', icon: 'pot-steam-outline', color: '#FFF8E1' },
-    { name: 'Batata-Doce', icon: 'nutrition', color: '#FFE0B2' },
-    { name: 'Macarrão', icon: 'pasta', color: '#FFF9C4' },
-    { name: 'Mandioca', icon: 'corn', color: '#FFFDE7' },
-    // PROTEÍNAS
-    { name: 'Feijão', icon: 'seed', color: '#EFEBE9' },
-    { name: 'Ovo', icon: 'egg', color: '#FFFDE7' },
-    { name: 'Frango', icon: 'food-drumstick', color: '#FBE9E7' },
-    { name: 'Carne Moída', icon: 'food-steak', color: '#FFEBEE' },
-    { name: 'Inhame', icon: 'mushroom-outline', color: '#F3E5F5' },
-  ];
-
   const Header = () => (
     <View style={styles.headerRow}>
       <View style={styles.headerLeft}>
         {step > 0 && (
-          <TouchableOpacity onPress={prevStep} style={styles.backButton} activeOpacity={0.7}>
+          <TouchableOpacity onPress={prevStep} activeOpacity={0.7} style={styles.backButton}>
             <MaterialCommunityIcons name="chevron-left" size={32} color="#5e5c54" />
           </TouchableOpacity>
         )}
       </View>
       <View style={styles.progressContainer}>
-        <View style={[styles.progressBar, { width: `${(step / totalSteps) * 100}%` }]} />
+        <View style={[styles.progressBar, { width: `${((step + 1) / totalSteps) * 100}%` }]} />
       </View>
-      <View style={styles.headerRight} />
+      <TouchableOpacity onPress={() => router.back()} style={styles.headerRight}>
+        <MaterialCommunityIcons name="close" size={22} color="#5e5c54" />
+      </TouchableOpacity>
     </View>
   );
 
@@ -160,32 +205,8 @@ export default function JucaOnboarding() {
     </TouchableOpacity>
   );
 
-  // --- RENDERIZAÇÃO ---
-
+  // Step 0 — Nome
   if (step === 0) return (
-    <SafeAreaView style={styles.fullScreen}>
-      <Header />
-      <View style={styles.centerContent}>
-        <Text style={styles.heroText}>Vamos personalizar o Juca para você!</Text>
-      </View>
-      <ArrowButton onPress={nextStep} />
-    </SafeAreaView>
-  );
-
-  if (step === 1) return (
-    <SafeAreaView style={styles.fullScreen}>
-      <Header />
-      <View style={styles.centerContent}>
-        <Text style={styles.reflectTitle}>Reflita sobre as necessidades do seu pequeno...</Text>
-        <Text style={styles.reflectSub}>
-          Assim podemos entender melhor e configurar um programa pessoal de introdução alimentar.
-        </Text>
-      </View>
-      <ArrowButton onPress={nextStep} />
-    </SafeAreaView>
-  );
-
-  if (step === 2) return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
       <Text style={styles.questionText}>Qual o nome do seu pequeno?</Text>
@@ -199,14 +220,15 @@ export default function JucaOnboarding() {
           autoFocus
         />
       </View>
-      <ArrowButton onPress={nextStep} disabled={nome.trim().length < 2} />
+      <ArrowButton onPress={nextStep} disabled={!nome} />
     </SafeAreaView>
   );
 
-  if (step === 3) return (
+  // Step 1 — Data de nascimento
+  if (step === 1) return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
-      <Text style={styles.questionText}>Quando ele(a) nasceu?</Text>
+      <Text style={styles.questionText}>Quando {nome} nasceu?</Text>
       <View style={styles.inputBlock}>
         <MaskInput
           style={styles.textInput}
@@ -224,7 +246,8 @@ export default function JucaOnboarding() {
     </SafeAreaView>
   );
 
-  if (step === 4) return (
+  // Step 2 — Sexo
+  if (step === 2) return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
       <Text style={styles.questionText}>Qual o sexo biológico?</Text>
@@ -244,7 +267,8 @@ export default function JucaOnboarding() {
     </SafeAreaView>
   );
 
-  if (step === 5) return (
+  // Step 3 — Alergias
+  if (step === 3) return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
       <Text style={styles.questionText}>Alguma alergia alimentar?</Text>
@@ -263,7 +287,8 @@ export default function JucaOnboarding() {
     </SafeAreaView>
   );
 
-  if (step === 6) return (
+  // Step 4 — Neurodivergência
+  if (step === 4) return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
       <Text style={styles.questionText}>Alguma neurodivergência?</Text>
@@ -273,16 +298,10 @@ export default function JucaOnboarding() {
           <TouchableOpacity
             key={opcao}
             activeOpacity={0.7}
-            style={[
-              styles.neuroBtn,
-              neuro.includes(opcao) && styles.neuroBtnActive,
-            ]}
+            style={[styles.neuroBtn, neuro.includes(opcao) && styles.neuroBtnActive]}
             onPress={() => toggleNeuro(opcao)}
           >
-            <Text style={[
-              styles.neuroText,
-              neuro.includes(opcao) && styles.neuroTextActive,
-            ]}>
+            <Text style={[styles.neuroText, neuro.includes(opcao) && styles.neuroTextActive]}>
               {opcao}
             </Text>
           </TouchableOpacity>
@@ -292,16 +311,13 @@ export default function JucaOnboarding() {
     </SafeAreaView>
   );
 
-  // Step 6 — Alimentos
+  // Step 5 — Alimentos
   return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
-      <Text style={styles.questionText}>O que ele(a) já come bem?</Text>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.grid}
-      >
-        {alimentos.map((item) => (
+      <Text style={styles.questionText}>O que {nome} já come bem?</Text>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.grid}>
+        {ALIMENTOS.map((item) => (
           <TouchableOpacity
             key={item.name}
             activeOpacity={0.7}
@@ -314,21 +330,14 @@ export default function JucaOnboarding() {
             <View style={[styles.iconCircle, { backgroundColor: item.color }]}>
               <MaterialCommunityIcons name={item.icon as any} size={30} color="#904c1f" />
             </View>
-            <Text
-              style={[
-                styles.foodLabel,
-                alimentosSelecionados.includes(item.name) && styles.foodLabelActive,
-              ]}
-            >
+            <Text style={[
+              styles.foodLabel,
+              alimentosSelecionados.includes(item.name) && styles.foodLabelActive,
+            ]}>
               {item.name}
             </Text>
           </TouchableOpacity>
         ))}
-        <TouchableOpacity activeOpacity={0.7} style={[styles.foodCard, styles.addCard]}>
-          <MaterialCommunityIcons name="plus" size={30} color="#904c1f" />
-          <Text style={styles.foodLabel}>Outros</Text>
-        </TouchableOpacity>
-        {/* Espaço para o footer não cobrir os cards */}
         <View style={{ height: 100 }} />
       </ScrollView>
       <View style={styles.footer}>
@@ -339,7 +348,7 @@ export default function JucaOnboarding() {
           activeOpacity={0.8}
         >
           <Text style={styles.finishText}>
-            {salvando ? 'Salvando...' : 'Finalizar Cadastro'}
+            {salvando ? 'Salvando...' : 'Adicionar filho'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -349,165 +358,34 @@ export default function JucaOnboarding() {
 
 const styles = StyleSheet.create({
   fullScreen: { flex: 1, backgroundColor: '#fcf9ef', paddingHorizontal: 30 },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 20,
-    marginBottom: 40,
-  },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 40 },
   headerLeft: { width: 40 },
-  headerRight: { width: 40 },
+  headerRight: { width: 40, alignItems: 'flex-end' },
   backButton: { marginLeft: -10 },
-  progressContainer: {
-    flex: 1,
-    height: 6,
-    backgroundColor: '#e4e3d9',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
+  progressContainer: { flex: 1, height: 6, backgroundColor: '#e4e3d9', borderRadius: 3, overflow: 'hidden' },
   progressBar: { height: '100%', backgroundColor: '#b22300' },
-
-  centerContent: { flex: 0.8, justifyContent: 'center', alignItems: 'center' },
-  heroText: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: '#1b1c16',
-    textAlign: 'center',
-    lineHeight: 44,
-  },
-  reflectTitle: {
-    fontSize: 34,
-    fontWeight: '800',
-    color: '#1b1c16',
-    textAlign: 'center',
-    lineHeight: 42,
-    marginBottom: 20,
-  },
-  reflectSub: { fontSize: 18, color: '#5e5c54', textAlign: 'center', lineHeight: 28 },
+  questionText: { fontSize: 32, fontWeight: '800', color: '#1b1c16', marginBottom: 30 },
   questionSub: { fontSize: 14, color: '#5e5c54', marginBottom: 20, marginTop: -20 },
   optionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  neuroBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: 100,
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#e4e3d9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 1,
-  },
+  neuroBtn: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 100, backgroundColor: '#fff', borderWidth: 2, borderColor: '#e4e3d9', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 1 },
   neuroBtnActive: { backgroundColor: '#b22300', borderColor: '#b22300' },
   neuroText: { fontSize: 15, fontWeight: '600', color: '#1b1c16' },
   neuroTextActive: { color: '#fff' },
-  questionText: { fontSize: 32, fontWeight: '800', color: '#1b1c16', marginBottom: 30 },
-
-  inputBlock: {
-    backgroundColor: '#eae8de',
-    borderRadius: 20,
-    padding: 22,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+  inputBlock: { backgroundColor: '#eae8de', borderRadius: 20, padding: 22, flexDirection: 'row', alignItems: 'center' },
   textInput: { flex: 1, fontSize: 18, color: '#1b1c16', fontWeight: '500' },
-
-  fab: {
-    position: 'absolute',
-    bottom: 40,
-    right: 30,
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: '#b22300',
-    justifyContent: 'center',
-    alignItems: 'center',
-    // Android
-    elevation: 5,
-    // iOS
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-
+  fab: { position: 'absolute', bottom: 40, right: 30, width: 70, height: 70, borderRadius: 35, backgroundColor: '#b22300', justifyContent: 'center', alignItems: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 4 },
   optionsCol: { gap: 15 },
-  optBtn: {
-    backgroundColor: '#fff',
-    padding: 25,
-    borderRadius: 24,
-    alignItems: 'center',
-    // Android
-    elevation: 2,
-    // iOS
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-  },
+  optBtn: { backgroundColor: '#fff', padding: 25, borderRadius: 24, alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 3 },
   optBtnActive: { backgroundColor: '#b22300' },
   optText: { fontSize: 18, fontWeight: '700', color: '#1b1c16' },
   optTextActive: { color: '#fff' },
-
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    paddingBottom: 20,
-  },
-  foodCard: {
-    width: (width - 80) / 2,
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 30,
-    alignItems: 'center',
-    marginBottom: 15,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    // Android
-    elevation: 1,
-    // iOS
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-  },
-  foodCardActive: {
-    borderWidth: 2,
-    borderColor: '#b22300',
-    backgroundColor: '#fff5f3',
-  },
-  iconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  foodLabel: { fontWeight: '600', color: '#1b1c16', fontSize: 14 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingBottom: 20 },
+  foodCard: { width: (width - 80) / 2, backgroundColor: '#fff', padding: 20, borderRadius: 30, alignItems: 'center', marginBottom: 15, borderWidth: 2, borderColor: 'transparent', elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 2 },
+  foodCardActive: { borderWidth: 2, borderColor: '#b22300', backgroundColor: '#fff5f3' },
+  iconCircle: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+  foodLabel: { fontWeight: '600', color: '#1b1c16', fontSize: 14, textAlign: 'center' },
   foodLabelActive: { color: '#b22300' },
-  addCard: {
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: '#e4e3d9',
-    backgroundColor: 'transparent',
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-
-  footer: {
-    paddingVertical: 20,
-    paddingHorizontal: 0,
-    backgroundColor: '#fcf9ef',
-  },
-  finishBtn: {
-    backgroundColor: '#b22300',
-    padding: 22,
-    borderRadius: 100,
-    alignItems: 'center',
-  },
+  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 30, backgroundColor: '#fcf9ef' },
+  finishBtn: { backgroundColor: '#b22300', padding: 22, borderRadius: 100, alignItems: 'center' },
   finishText: { color: '#fff', fontSize: 18, fontWeight: '700' },
 });
