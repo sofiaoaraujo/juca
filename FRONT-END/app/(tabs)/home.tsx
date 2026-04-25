@@ -396,9 +396,8 @@ export default function Home() {
   const [alimentoAtivo, setAlimentoAtivo] = useState<AlimentoSugerido | null>(null);
   const [sugestoes, setSugestoes] = useState<AlimentoSugerido[]>([]);
   const [carregandoSugestoes, setCarregandoSugestoes] = useState(false);
-
   const carregarSugestoes = async () => {
-    if (!filhoAtivo) return;
+    if (!filhoAtivo || carregandoSugestoes) return;
     setCarregandoSugestoes(true);
     try {
       const alimentosAceitos = filhoAtivo.alimentosSelecionados ?? [];
@@ -410,9 +409,10 @@ export default function Home() {
       );
       const comCores = resultado.map(s => {
         const cores = CORES_CATEGORIA[s.categoria] ?? CORES_CATEGORIA.default;
-        return { ...s, name: s.nome, icon: cores.icon, corFundo: cores.fundo, corIcone: cores.icone };
+        return { ...s, icon: cores.icon, corFundo: cores.fundo, corIcone: cores.icone };
       });
       setSugestoes(comCores);
+
     } catch (error) {
       console.error('Erro ao buscar sugestões:', error);
     } finally {
@@ -467,6 +467,28 @@ export default function Home() {
       console.log('Sessão salva:', sessao);
       // ✅ Salvar na API aqui
       fecharTrilha();
+
+      // Busca novo alimento para substituir o concluído
+      if (alimentoAtivo && filhoAtivo) {
+        const alimentosAceitos = [
+          ...(filhoAtivo.alimentosSelecionados ?? []),
+          alimentoAtivo.nome,
+        ];
+        const resultado = await obterSugestoesFoodChaining(
+          filhoAtivo.nome,
+          filhoAtivo.alergias ?? '',
+          filhoAtivo.neuro ?? '',
+          alimentosAceitos,
+        );
+        if (resultado.length > 0) {
+          const novo = resultado[0];
+          const cores = CORES_CATEGORIA[novo.categoria] ?? CORES_CATEGORIA.default;
+          const novoComCores = { ...novo, icon: cores.icon, corFundo: cores.fundo, corIcone: cores.icone };
+          setSugestoes(prev => prev.map(s =>
+            s.id === alimentoAtivo.id ? novoComCores : s
+          ));
+        }
+      }
     } catch (error) {
       console.error('Erro:', error);
     } finally {
@@ -686,7 +708,8 @@ const styles = StyleSheet.create({
   recarregarText: { fontSize: 15, fontWeight: '700', color: '#b22300' },
   foodCard: { width: '47%', borderRadius: 28, padding: 18, alignItems: 'center', shadowColor: '#4b4944', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.06, shadowRadius: 32, elevation: 3 },
   cardCategoria: { fontSize: 10, fontWeight: '700', color: '#904c1f', letterSpacing: 1.5, marginBottom: 12, alignSelf: 'flex-start' },
-  iconeCircle: { width: (width - 112) / 2, aspectRatio: 1, borderRadius: 999, justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
+  iconeCircle: { width: (width - 112) / 2, aspectRatio: 1, borderRadius: 999, justifyContent: 'center', alignItems: 'center', marginBottom: 14, overflow: 'hidden' },
+  cardImagem: { width: '100%', height: '100%', borderRadius: 999 },
   cardNome: { fontSize: 15, fontWeight: '800', color: '#1b1c16', textAlign: 'center', marginBottom: 6 },
   cardMotivo: { fontSize: 11, color: '#5e5c54', textAlign: 'center', lineHeight: 15, marginBottom: 14 },
   cardBotao: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(178,35,0,0.08)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 100 },

@@ -2,23 +2,75 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  Alert,
   Dimensions,
+  Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  Alert,
 } from 'react-native';
-import MaskInput from 'react-native-mask-input';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import MaskInput from 'react-native-mask-input';
 import { useFilhos } from '../context/FilhosContext';
-import api from '../services/api';
+
+// Mapa de imagens locais dos alimentos
+const IMAGENS_ALIMENTOS: Record<string, any> = {
+  'Banana': require('../assets/alimentos/banana.png'),
+  'Maçã': require('../assets/alimentos/maca.png'),
+  'Mamão': require('../assets/alimentos/mamao.png'),
+  'Manga': require('../assets/alimentos/manga.png'),
+  'Melancia': require('../assets/alimentos/melancia.png'),
+  'Cenoura': require('../assets/alimentos/cenoura.png'),
+  'Brócolis': require('../assets/alimentos/brocolis.png'),
+  'Abobrinha': require('../assets/alimentos/abobrinha.png'),
+  'Beterraba': require('../assets/alimentos/beterraba.png'),
+  'Chuchu': require('../assets/alimentos/chuchu.png'),
+  'Arroz': require('../assets/alimentos/arroz.png'),
+  'Batata': require('../assets/alimentos/batata.png'),
+  'Batata-Doce': require('../assets/alimentos/batata-doce.png'),
+  'Macarrão': require('../assets/alimentos/macarrao.png'),
+  'Mandioca': require('../assets/alimentos/mandioca.png'),
+  'Feijão': require('../assets/alimentos/feijao.png'),
+  'Ovo': require('../assets/alimentos/ovo.png'),
+  'Frango': require('../assets/alimentos/frango.png'),
+  'Carne Moída': require('../assets/alimentos/carne-moida.png'),
+  'Inhame': require('../assets/alimentos/inhame.png'),
+};
 
 const dataMask = [/\d/, /\d/, '/', /\d/, /\d/, '/', /\d/, /\d/, /\d/, /\d/];
 
 const { width } = Dimensions.get('window');
+
+const alimentos = [
+  // FRUTAS
+  { name: 'Banana', icon: 'fruit-cherries', color: '#FFF9C4' },
+  { name: 'Maçã', icon: 'food-apple', color: '#FFEBEE' },
+  { name: 'Mamão', icon: 'fruit-pineapple', color: '#FFE0B2' },
+  { name: 'Manga', icon: 'fruit-grapes', color: '#FFF3E0' },
+  { name: 'Melancia', icon: 'fruit-watermelon', color: '#FCE4EC' },
+  // VERDURAS E LEGUMES
+  { name: 'Cenoura', icon: 'carrot', color: '#FFF3E0' },
+  { name: 'Brócolis', icon: 'sprout', color: '#E8F5E9' },
+  { name: 'Abobrinha', icon: 'leaf', color: '#F1F8E9' },
+  { name: 'Beterraba', icon: 'circle-slice-8', color: '#FCE4EC' },
+  { name: 'Chuchu', icon: 'leaf-circle-outline', color: '#F0F4C3' },
+  // CARBOIDRATOS
+  { name: 'Arroz', icon: 'rice', color: '#F5F5F5' },
+  { name: 'Batata', icon: 'pot-steam-outline', color: '#FFF8E1' },
+  { name: 'Batata-Doce', icon: 'nutrition', color: '#FFE0B2' },
+  { name: 'Macarrão', icon: 'pasta', color: '#FFF9C4' },
+  { name: 'Mandioca', icon: 'corn', color: '#FFFDE7' },
+  // PROTEÍNAS
+  { name: 'Feijão', icon: 'seed', color: '#EFEBE9' },
+  { name: 'Ovo', icon: 'egg', color: '#FFFDE7' },
+  { name: 'Frango', icon: 'food-drumstick', color: '#FBE9E7' },
+  { name: 'Carne Moída', icon: 'food-steak', color: '#FFEBEE' },
+  { name: 'Inhame', icon: 'mushroom-outline', color: '#F3E5F5' },
+];
 
 export default function JucaOnboarding() {
   const router = useRouter();
@@ -29,6 +81,7 @@ export default function JucaOnboarding() {
   const [sexo, setSexo] = useState('');
   const [alergias, setAlergias] = useState('');
   const [neuro, setNeuro] = useState<string[]>([]);
+  const [outraNeuro, setOutraNeuro] = useState('');
   const [alimentosSelecionados, setAlimentosSelecionados] = useState<string[]>([]);
   const [salvando, setSalvando] = useState(false);
 
@@ -65,73 +118,27 @@ export default function JucaOnboarding() {
         dataNasc,
         sexo,
         alergias,
-        neuro: neuro.join(', '),
+        neuro: neuro.includes('Outra') && outraNeuro
+          ? [...neuro.filter(n => n !== 'Outra'), outraNeuro].join(', ')
+          : neuro.join(', '),
         alimentosSelecionados,
       });
 
-      // ✅ Salvar no banco de dados aqui , CONEXÃO COM BACK-END
-
-      //Busca todos os alimentos do banco para mapear nome → id
-      const alimentosDB = await api.get('/alimentos/');
-
-      const response = await api.post('/criancas/', {
-        nome: nome,
-        data_nascimento: dataNasc.split('/').reverse().join('-'), // Converte de DD/MM/AAAA para AAAA-MM-DD
-        cuidador_id: 'b594dcf7-51ee-405a-9fb4-eb60befd19f9', // Substitua pelo ID real do cuidador, que deve ser obtido após o login ou cadastro do responsável (ANALISAR ESSA PARTE DEPOIS)**
-        sexo: sexo
-      });
-
-      const criancaDaAPI = response.data; // O objeto retornado pelo backend após criar a criança
-      const criancaId = criancaDaAPI.id; // ID retornado pelo backend
-
-      // Salva cada alimento vinculado à criança
-      for (const nomeAlimento of alimentosSelecionados) {
-        const alimento = alimentosDB.data.find((a: any) => a.nome === nomeAlimento);
-        if (alimento) {
-          await api.post('/progresso/', {    // ! É progresso mesmo, não mude
-            crianca_id: criancaId,
-            alimento_id: alimento.id,
-            status: 'Aceita',               // * PODE MUDAR DEPOIS, DEPENDE DE COMO VAMOS GERENCIAR ESSA PARTE DE ACEITO/RECUSADO/NEUTRO
-          });
-        }
-      }
+      // ✅ Salvar no banco de dados aqui
+      // await fetch('https://sua-api.com/cadastro', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ nome, dataNasc, sexo, alergias, neuro, alimentosSelecionados }),
+      // });
 
       router.replace('/(tabs)/home');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro ao salvar:', error);
-      console.error('Detalhes do erro:', error?.response?.data);
       Alert.alert('Erro', 'Não foi possível salvar os dados. Tente novamente.');
     } finally {
       setSalvando(false);
     }
   };
-
-  const alimentos = [
-    // FRUTAS
-    { name: 'Banana', icon: 'fruit-cherries', color: '#FFF9C4' },
-    { name: 'Maçã', icon: 'food-apple', color: '#FFEBEE' },
-    { name: 'Mamão', icon: 'fruit-pineapple', color: '#FFE0B2' },
-    { name: 'Manga', icon: 'fruit-grapes', color: '#FFF3E0' },
-    { name: 'Melancia', icon: 'fruit-watermelon', color: '#FCE4EC' },
-    // VERDURAS E LEGUMES
-    { name: 'Cenoura', icon: 'carrot', color: '#FFF3E0' },
-    { name: 'Brócolis', icon: 'sprout', color: '#E8F5E9' },
-    { name: 'Abobrinha', icon: 'leaf', color: '#F1F8E9' },
-    { name: 'Beterraba', icon: 'circle-slice-8', color: '#FCE4EC' },
-    { name: 'Chuchu', icon: 'leaf-circle-outline', color: '#F0F4C3' },
-    // CARBOIDRATOS
-    { name: 'Arroz', icon: 'rice', color: '#F5F5F5' },
-    { name: 'Batata', icon: 'pot-steam-outline', color: '#FFF8E1' },
-    { name: 'Batata-Doce', icon: 'nutrition', color: '#FFE0B2' },
-    { name: 'Macarrão', icon: 'pasta', color: '#FFF9C4' },
-    { name: 'Mandioca', icon: 'corn', color: '#FFFDE7' },
-    // PROTEÍNAS
-    { name: 'Feijão', icon: 'seed', color: '#EFEBE9' },
-    { name: 'Ovo', icon: 'egg', color: '#FFFDE7' },
-    { name: 'Frango', icon: 'food-drumstick', color: '#FBE9E7' },
-    { name: 'Carne Moída', icon: 'food-steak', color: '#FFEBEE' },
-    { name: 'Inhame', icon: 'mushroom-outline', color: '#F3E5F5' },
-  ];
 
   const Header = () => (
     <View style={styles.headerRow}>
@@ -199,7 +206,7 @@ export default function JucaOnboarding() {
           autoFocus
         />
       </View>
-      <ArrowButton onPress={nextStep} disabled={nome.trim().length < 2} />
+      <ArrowButton onPress={nextStep} disabled={!nome} />
     </SafeAreaView>
   );
 
@@ -288,6 +295,18 @@ export default function JucaOnboarding() {
           </TouchableOpacity>
         ))}
       </View>
+      {neuro.includes('Outra') && (
+        <View style={styles.inputBlock}>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Qual neurodivergência?"
+            placeholderTextColor="#5e5c5480"
+            value={outraNeuro}
+            onChangeText={setOutraNeuro}
+            autoFocus
+          />
+        </View>
+      )}
       <ArrowButton onPress={nextStep} />
     </SafeAreaView>
   );
@@ -312,7 +331,14 @@ export default function JucaOnboarding() {
             onPress={() => toggleAlimento(item.name)}
           >
             <View style={[styles.iconCircle, { backgroundColor: item.color }]}>
-              <MaterialCommunityIcons name={item.icon as any} size={30} color="#904c1f" />
+              {IMAGENS_ALIMENTOS[item.name] ? (
+                <Image
+                  source={IMAGENS_ALIMENTOS[item.name]}
+                  style={styles.foodImage}
+                />
+              ) : (
+                <MaterialCommunityIcons name={item.icon as any} size={30} color="#904c1f" />
+              )}
             </View>
             <Text
               style={[
@@ -324,11 +350,6 @@ export default function JucaOnboarding() {
             </Text>
           </TouchableOpacity>
         ))}
-        <TouchableOpacity activeOpacity={0.7} style={[styles.foodCard, styles.addCard]}>
-          <MaterialCommunityIcons name="plus" size={30} color="#904c1f" />
-          <Text style={styles.foodLabel}>Outros</Text>
-        </TouchableOpacity>
-        {/* Espaço para o footer não cobrir os cards */}
         <View style={{ height: 100 }} />
       </ScrollView>
       <View style={styles.footer}>
@@ -486,8 +507,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
+    overflow: 'hidden',
   },
-  foodLabel: { fontWeight: '600', color: '#1b1c16', fontSize: 14 },
+  foodImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  foodLabel: { fontWeight: '600', color: '#1b1c16', fontSize: 13, textAlign: 'center', flexWrap: 'wrap' },
   foodLabelActive: { color: '#b22300' },
   addCard: {
     borderWidth: 2,

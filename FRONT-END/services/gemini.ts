@@ -1,5 +1,8 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+const CACHE_HORAS = 6;
 
 export type SugestaoAlimento = {
   id: string;
@@ -23,6 +26,21 @@ export async function obterSugestoesFoodChaining(
   neuro: string,
   alimentosAceitos: string[]
 ): Promise<SugestaoAlimento[]> {
+
+  // ── Verifica cache ────────────────────────────────────────────────────────
+  const cacheKey = `@juca:sugestoes:v2:${nomeFilho}`;
+  try {
+    const cached = await AsyncStorage.getItem(cacheKey);
+    if (cached) {
+      const { data, timestamp } = JSON.parse(cached);
+      const horas = (Date.now() - timestamp) / 1000 / 3600;
+      if (horas < CACHE_HORAS) {
+        console.log('Sugestões do cache!');
+        return data;
+      }
+    }
+  } catch {}
+  // ─────────────────────────────────────────────────────────────────────────
   const prompt = `
 Você é um nutricionista especialista em Food Chaining para crianças com dificuldades alimentares.
 
@@ -62,6 +80,8 @@ Retorne SOMENTE um JSON válido, sem texto adicional, sem markdown, sem explica�
   });
 
   if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    console.log('Erro Gemini detalhes:', JSON.stringify(errorBody));
     throw new Error(`Erro na API do Gemini: ${response.status}`);
   }
 
@@ -71,7 +91,14 @@ Retorne SOMENTE um JSON válido, sem texto adicional, sem markdown, sem explica�
   if (!text) throw new Error('Resposta vazia do Gemini');
 
   const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
-  return parsed.sugestoes as SugestaoAlimento[];
+  const sugestoes = parsed.sugestoes as SugestaoAlimento[];
+
+  // Salva no cache
+  try {
+    await AsyncStorage.setItem(cacheKey, JSON.stringify({ data: sugestoes, timestamp: Date.now() }));
+  } catch {}
+
+  return sugestoes;
 }
 
 // ─── Análise Clínica para Relatório ──────────────────────────────────────────

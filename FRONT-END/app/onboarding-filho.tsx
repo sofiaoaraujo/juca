@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import {
   Alert,
   Dimensions,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,9 +12,32 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import MaskInput from 'react-native-mask-input';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import MaskInput from 'react-native-mask-input';
 import { useFilhos } from '../context/FilhosContext';
+
+const IMAGENS_ALIMENTOS: Record<string, any> = {
+  'Banana': require('../assets/alimentos/banana.png'),
+  'Maçã': require('../assets/alimentos/maca.png'),
+  'Mamão': require('../assets/alimentos/mamao.png'),
+  'Manga': require('../assets/alimentos/manga.png'),
+  'Melancia': require('../assets/alimentos/melancia.png'),
+  'Cenoura': require('../assets/alimentos/cenoura.png'),
+  'Brócolis': require('../assets/alimentos/brocolis.png'),
+  'Abobrinha': require('../assets/alimentos/abobrinha.png'),
+  'Beterraba': require('../assets/alimentos/beterraba.png'),
+  'Chuchu': require('../assets/alimentos/chuchu.png'),
+  'Arroz': require('../assets/alimentos/arroz.png'),
+  'Batata': require('../assets/alimentos/batata.png'),
+  'Batata-Doce': require('../assets/alimentos/batata-doce.png'),
+  'Macarrão': require('../assets/alimentos/macarrao.png'),
+  'Mandioca': require('../assets/alimentos/mandioca.png'),
+  'Feijão': require('../assets/alimentos/feijao.png'),
+  'Ovo': require('../assets/alimentos/ovo.png'),
+  'Frango': require('../assets/alimentos/frango.png'),
+  'Carne Moída': require('../assets/alimentos/carne-moida.png'),
+  'Inhame': require('../assets/alimentos/inhame.png'),
+};
 
 const dataMask = [/\d/, /\d/, '/', /\d/, /\d/, '/', /\d/, /\d/, /\d/, /\d/];
 const { width } = Dimensions.get('window');
@@ -50,13 +74,27 @@ export default function OnboardingFilho() {
   const [dataNasc, setDataNasc] = useState('');
   const [sexo, setSexo] = useState('');
   const [alergias, setAlergias] = useState('');
-  const [neuro, setNeuro] = useState('');
+  const [neuro, setNeuro] = useState<string[]>([]);
+  const [outraNeuro, setOutraNeuro] = useState('');
   const [alimentosSelecionados, setAlimentosSelecionados] = useState<string[]>([]);
   const [salvando, setSalvando] = useState(false);
 
-  const totalSteps = 5;
+  const totalSteps = 6;
   const nextStep = () => setStep(s => s + 1);
   const prevStep = () => setStep(s => Math.max(0, s - 1));
+
+  const toggleNeuro = (opcao: string) => {
+    if (opcao === 'Nenhuma') {
+      setNeuro(['Nenhuma']);
+      return;
+    }
+    setNeuro(prev => {
+      const semNenhuma = prev.filter(n => n !== 'Nenhuma');
+      return semNenhuma.includes(opcao)
+        ? semNenhuma.filter(n => n !== opcao)
+        : [...semNenhuma, opcao];
+    });
+  };
 
   const toggleAlimento = (nomeAlimento: string) => {
     setAlimentosSelecionados(prev =>
@@ -74,7 +112,9 @@ export default function OnboardingFilho() {
         dataNasc,
         sexo,
         alergias,
-        neuro,
+        neuro: neuro.includes('Outra') && outraNeuro
+          ? [...neuro.filter(n => n !== 'Outra'), outraNeuro].join(', ')
+          : neuro.join(', '),
         alimentosSelecionados,
       });
       router.replace('/(tabs)/home');
@@ -176,35 +216,63 @@ export default function OnboardingFilho() {
     </SafeAreaView>
   );
 
-  // Step 3 — Alergias e neuro
+  // Step 3 — Alergias
   if (step === 3) return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
-      <Text style={styles.questionText}>Alguma restrição ou condição especial?</Text>
-      <View style={[styles.inputBlock, { marginBottom: 20 }]}>
+      <Text style={styles.questionText}>Alguma alergia alimentar?</Text>
+      <Text style={styles.questionSub}>Opcional — liste as alergias conhecidas</Text>
+      <View style={styles.inputBlock}>
         <TextInput
-          style={styles.textInput}
-          placeholder="Alergias (Opcional)"
+          style={[styles.textInput, { minHeight: 80, textAlignVertical: 'top' }]}
+          placeholder="Ex: Amendoim, Lactose, Glúten..."
           placeholderTextColor="#5e5c5480"
           value={alergias}
           onChangeText={setAlergias}
+          multiline
         />
-      </View>
-      <View style={styles.inputBlock}>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Neurodivergência (Opcional)"
-          placeholderTextColor="#5e5c5480"
-          value={neuro}
-          onChangeText={setNeuro}
-        />
-        <MaterialCommunityIcons name="brain" size={20} color="#904c1f" />
       </View>
       <ArrowButton onPress={nextStep} />
     </SafeAreaView>
   );
 
-  // Step 4 — Alimentos
+  // Step 4 — Neurodivergência
+  if (step === 4) return (
+    <SafeAreaView style={styles.fullScreen}>
+      <Header />
+      <Text style={styles.questionText}>Alguma neurodivergência?</Text>
+      <Text style={styles.questionSub}>Opcional — selecione todas que se aplicam</Text>
+      <View style={styles.optionsGrid}>
+        {['TEA', 'TDAH', 'Transtorno de Ansiedade', 'TARE', 'Outra', 'Nenhuma'].map((opcao) => (
+          <TouchableOpacity
+            key={opcao}
+            activeOpacity={0.7}
+            style={[styles.neuroBtn, neuro.includes(opcao) && styles.neuroBtnActive]}
+            onPress={() => toggleNeuro(opcao)}
+          >
+            <Text style={[styles.neuroText, neuro.includes(opcao) && styles.neuroTextActive]}>
+              {opcao}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {neuro.includes('Outra') && (
+        <View style={[styles.inputBlock, { marginTop: 20 }]}>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Qual neurodivergência?"
+            placeholderTextColor="#5e5c5480"
+            value={outraNeuro}
+            onChangeText={setOutraNeuro}
+            autoFocus
+          />
+        </View>
+      )}
+      <ArrowButton onPress={nextStep} />
+    </SafeAreaView>
+  );
+
+  // Step 5 — Alimentos
   return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
@@ -221,7 +289,11 @@ export default function OnboardingFilho() {
             onPress={() => toggleAlimento(item.name)}
           >
             <View style={[styles.iconCircle, { backgroundColor: item.color }]}>
-              <MaterialCommunityIcons name={item.icon as any} size={30} color="#904c1f" />
+              {IMAGENS_ALIMENTOS[item.name] ? (
+                <Image source={IMAGENS_ALIMENTOS[item.name]} style={styles.foodImage} />
+              ) : (
+                <MaterialCommunityIcons name={item.icon as any} size={30} color="#904c1f" />
+              )}
             </View>
             <Text style={[
               styles.foodLabel,
@@ -261,6 +333,12 @@ const styles = StyleSheet.create({
   inputBlock: { backgroundColor: '#eae8de', borderRadius: 20, padding: 22, flexDirection: 'row', alignItems: 'center' },
   textInput: { flex: 1, fontSize: 18, color: '#1b1c16', fontWeight: '500' },
   fab: { position: 'absolute', bottom: 40, right: 30, width: 70, height: 70, borderRadius: 35, backgroundColor: '#b22300', justifyContent: 'center', alignItems: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 4 },
+  questionSub: { fontSize: 14, color: '#5e5c54', marginBottom: 20, marginTop: -20 },
+  optionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  neuroBtn: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 100, backgroundColor: '#fff', borderWidth: 2, borderColor: '#e4e3d9', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 1 },
+  neuroBtnActive: { backgroundColor: '#b22300', borderColor: '#b22300' },
+  neuroText: { fontSize: 15, fontWeight: '600', color: '#1b1c16' },
+  neuroTextActive: { color: '#fff' },
   optionsCol: { gap: 15 },
   optBtn: { backgroundColor: '#fff', padding: 25, borderRadius: 24, alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 3 },
   optBtnActive: { backgroundColor: '#b22300' },
@@ -269,10 +347,11 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingBottom: 20 },
   foodCard: { width: (width - 80) / 2, backgroundColor: '#fff', padding: 20, borderRadius: 30, alignItems: 'center', marginBottom: 15, borderWidth: 2, borderColor: 'transparent', elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 2 },
   foodCardActive: { borderWidth: 2, borderColor: '#b22300', backgroundColor: '#fff5f3' },
-  iconCircle: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-  foodLabel: { fontWeight: '600', color: '#1b1c16', fontSize: 14, textAlign: 'center' },
+  iconCircle: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 10, overflow: 'hidden' },
+  foodImage: { width: 60, height: 60, borderRadius: 30 },
+  foodLabel: { fontWeight: '600', color: '#1b1c16', fontSize: 13, textAlign: 'center', flexWrap: 'wrap' },
   foodLabelActive: { color: '#b22300' },
-  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 30, backgroundColor: '#fcf9ef' },
+  footer: { paddingVertical: 20, paddingHorizontal: 0, backgroundColor: '#fcf9ef' },
   finishBtn: { backgroundColor: '#b22300', padding: 22, borderRadius: 100, alignItems: 'center' },
   finishText: { color: '#fff', fontSize: 18, fontWeight: '700' },
 });
