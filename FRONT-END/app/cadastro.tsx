@@ -2,20 +2,19 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { supabase } from '../services/supabase';
 
-const { width, height } = Dimensions.get('window');
-const TILE_SIZE = 200;
-
+const { height } = Dimensions.get('window');
 
 export default function Cadastro() {
   const router = useRouter();
@@ -24,20 +23,44 @@ export default function Cadastro() {
   const [senha, setSenha] = useState('');
   const [senhaVisivel, setSenhaVisivel] = useState(false);
   const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState('');
 
   const podeCadastrar = nome.trim() && email.trim() && senha.length >= 6;
 
   const handleCadastro = async () => {
     setCarregando(true);
+    setErro('');
     try {
-      // ✅ Conectar à API de cadastro aqui
-      // const response = await fetch('https://sua-api.com/auth/cadastro', { ... });
-
-      // Após cadastro → questionário do primeiro filho
-      // app/index.tsx é a rota raiz '/'
-      router.replace('/' as any);
-    } catch (error) {
-      console.error('Erro ao cadastrar:', error);
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: senha,
+      });
+      if (error) {
+        if (error.message.includes('already registered') || error.message.includes('User already registered')) {
+          setErro('Este e-mail já está cadastrado.');
+        } else if (error.message.includes('invalid') || error.message.toLowerCase().includes('email')) {
+          setErro('E-mail inválido. Verifique e tente novamente.');
+        } else if (error.message.includes('Password')) {
+          setErro('A senha deve ter pelo menos 6 caracteres.');
+        } else {
+          setErro('Ocorreu um erro. Tente novamente.');
+        }
+        return;
+      }
+      if (!data.session) {
+        setErro('Verifique seu e-mail para confirmar a conta antes de entrar.');
+        return;
+      }
+      if (data.user) {
+        await supabase.from('usuarios').insert({
+          id: data.user.id,
+          nome: nome.trim(),
+          email: email.toLowerCase().trim(),
+        });
+      }
+      router.replace('/');
+    } catch {
+      setErro('Ocorreu um erro. Tente novamente.');
     } finally {
       setCarregando(false);
     }
@@ -67,7 +90,7 @@ export default function Cadastro() {
               placeholder="Seu nome completo"
               placeholderTextColor="rgba(94,92,84,0.5)"
               value={nome}
-              onChangeText={setNome}
+              onChangeText={t => { setNome(t); setErro(''); }}
               autoCapitalize="words"
             />
           </View>
@@ -79,7 +102,7 @@ export default function Cadastro() {
               placeholder="seu@email.com"
               placeholderTextColor="rgba(94,92,84,0.5)"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={t => { setEmail(t); setErro(''); }}
               keyboardType="email-address"
               autoCapitalize="none"
             />
@@ -92,7 +115,7 @@ export default function Cadastro() {
               placeholder="••••••••"
               placeholderTextColor="rgba(94,92,84,0.5)"
               value={senha}
-              onChangeText={setSenha}
+              onChangeText={t => { setSenha(t); setErro(''); }}
               secureTextEntry={!senhaVisivel}
             />
             <TouchableOpacity activeOpacity={0.7} onPress={() => setSenhaVisivel(!senhaVisivel)}>
@@ -106,6 +129,13 @@ export default function Cadastro() {
           {senha.length > 0 && senha.length < 6 && (
             <Text style={styles.senhaAviso}>Mínimo de 6 caracteres</Text>
           )}
+
+          {erro ? (
+            <View style={styles.erroBox}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#b22300" />
+              <Text style={styles.erroText}>{erro}</Text>
+            </View>
+          ) : null}
 
           <TouchableOpacity
             activeOpacity={0.85}
@@ -144,6 +174,17 @@ const styles = StyleSheet.create({
   inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f6f4ea', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 16, marginBottom: 20 },
   input: { flex: 1, fontSize: 15, color: '#1b1c16' },
   senhaAviso: { fontSize: 12, color: '#b22300', marginTop: -14, marginBottom: 16, paddingLeft: 4 },
+  erroBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#fff5f3',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  erroText: { flex: 1, fontSize: 13, color: '#b22300', lineHeight: 18 },
   criarBtn: { backgroundColor: '#b22300', alignItems: 'center', justifyContent: 'center', paddingVertical: 18, borderRadius: 16, marginTop: 4, marginBottom: 28, shadowColor: '#b22300', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 4 },
   btnOff: { opacity: 0.4 },
   criarBtnText: { color: '#fff', fontSize: 17, fontWeight: '800' },
