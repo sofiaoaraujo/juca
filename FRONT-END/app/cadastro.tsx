@@ -11,6 +11,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Alert
 } from 'react-native';
 import { supabase } from '../services/supabase';
 
@@ -28,43 +29,54 @@ export default function Cadastro() {
   const podeCadastrar = nome.trim() && email.trim() && senha.length >= 6;
 
   const handleCadastro = async () => {
-    setCarregando(true);
-    setErro('');
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password: senha,
-      });
-      if (error) {
-        if (error.message.includes('already registered') || error.message.includes('User already registered')) {
-          setErro('Este e-mail já está cadastrado.');
-        } else if (error.message.includes('invalid') || error.message.toLowerCase().includes('email')) {
-          setErro('E-mail inválido. Verifique e tente novamente.');
-        } else if (error.message.includes('Password')) {
-          setErro('A senha deve ter pelo menos 6 caracteres.');
-        } else {
-          setErro('Ocorreu um erro. Tente novamente.');
-        }
-        return;
-      }
-      if (!data.session) {
-        setErro('Verifique seu e-mail para confirmar a conta antes de entrar.');
-        return;
-      }
-      if (data.user) {
-        await supabase.from('usuarios').insert({
-          id: data.user.id,
-          nome: nome.trim(),
-          email: email.toLowerCase().trim(),
+      setCarregando(true);
+      setErro('');
+      
+      try {
+        // 1. Cria o usuário e já envia o NOME nos metadados para o Gatilho do banco usar
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password: senha,
+          options: {
+            data: {
+              nome: nome.trim() // <-- O Gatilho vai ler isso aqui!
+            }
+          }
         });
+
+        if (error) {
+          if (error.message.includes('already registered')) {
+            setErro('Este e-mail já está cadastrado.');
+          } else if (error.message.toLowerCase().includes('email')) {
+            setErro('E-mail inválido.');
+          } else if (error.message.includes('Password')) {
+            setErro('A senha deve ter pelo menos 6 caracteres.');
+          } else {
+            setErro(error.message);
+          }
+          return; 
+        }
+
+        // O GATILHO JÁ FEZ O TRABALHO PESADO DE INSERIR NA TABELA 'usuarios' LÁ NO BANCO!
+
+        // 2. Redirecionamento
+        if (data.session) {
+          router.replace('/');
+        } else {
+          Alert.alert(
+            "Conta criada com sucesso! 🎉",
+            "Enviamos um link de confirmação para o seu e-mail. Por favor, verifique sua caixa de entrada (e o spam) para ativar sua conta.",
+            [{ text: "Entendi", onPress: () => router.replace('/login') }]
+            );
+        }
+
+      } catch (err) {
+        setErro('Ocorreu um erro inesperado. Tente novamente.');
+        console.error(err);
+      } finally {
+        setCarregando(false);
       }
-      router.replace('/');
-    } catch {
-      setErro('Ocorreu um erro. Tente novamente.');
-    } finally {
-      setCarregando(false);
-    }
-  };
+    };
 
   return (
     <View style={styles.container}>
