@@ -3,7 +3,6 @@ import { View, Text, StyleSheet } from 'react-native';
 
 export default function JornadaDetalhes() {
   const { id } = useLocalSearchParams<{ id: string }>();
-
   return (
     <View style={styles.container}>
       <Text style={styles.texto}>Jornada {id}</Text>

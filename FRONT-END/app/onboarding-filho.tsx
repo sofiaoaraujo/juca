@@ -15,6 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaskInput from 'react-native-mask-input';
 import { useFilhos } from '../context/FilhosContext';
+import api from '../services/api';
+import { supabase } from '../services/supabase';
 
 const IMAGENS_ALIMENTOS: Record<string, any> = {
   'Banana': require('../assets/alimentos/banana.png'),
@@ -107,19 +109,77 @@ export default function OnboardingFilho() {
   const handleFinalizar = async () => {
     setSalvando(true);
     try {
-      await adicionarFilho({
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado.');
+
+      const dataFormatada = dataNasc.split('/').reverse().join('-');
+      const responseCrianca = await api.post('/criancas/', {
         nome,
-        dataNasc,
+        data_nascimento: dataFormatada,
         sexo,
-        alergias,
-        neuro: neuro.includes('Outra') && outraNeuro
-          ? [...neuro.filter(n => n !== 'Outra'), outraNeuro].join(', ')
-          : neuro.join(', '),
+        cuidador_id: user.id,
+      });
+      const criancaId = responseCrianca.data.id;
+
+      const neuroFinal = neuro.includes('Outra') && outraNeuro
+        ? [...neuro.filter(n => n !== 'Outra'), outraNeuro]
+        : neuro;
+
+      if (neuroFinal.length > 0 && !neuroFinal.includes('Nenhuma')) {
+        const respNeuro = await api.get('/neurodivergencias/');
+        for (const neuroTexto of neuroFinal) {
+          const neuroEncontrada = respNeuro.data.find(
+            (n: any) => n.neurodivergencia.toLowerCase() === neuroTexto.toLowerCase()
+          );
+          if (neuroEncontrada) {
+            await api.post('/criancas-neurodivergencias/', {
+              crianca_id: criancaId,
+              neurodivergencia_id: neuroEncontrada.id,
+            });
+          }
+        }
+      }
+
+      if (alergias && alergias.trim() !== '') {
+        const respAlergias = await api.get('/alergias/');
+        const alergiasExistentes = respAlergias.data;
+        const alergiasDigitadas = alergias.split(',').map(a => a.trim());
+        for (const alergiaTexto of alergiasDigitadas) {
+          if (!alergiaTexto) continue;
+          let alergiaId = null;
+          const alergiaEncontrada = alergiasExistentes.find(
+            (a: any) => a.nome.toLowerCase() === alergiaTexto.toLowerCase()
+          );
+          if (alergiaEncontrada) {
+            alergiaId = alergiaEncontrada.id;
+          } else {
+            const novaAlergia = await api.post('/alergias/', { nome: alergiaTexto });
+            alergiaId = novaAlergia.data.id;
+          }
+          if (alergiaId) {
+            await api.post('/criancas-alergias/', { crianca_id: criancaId, alergia_id: alergiaId });
+          }
+        }
+      }
+
+      const alimentosDB = await api.get('/alimentos/');
+      for (const nomeAlimento of alimentosSelecionados) {
+        const alimento = alimentosDB.data.find((a: any) => a.nome === nomeAlimento);
+        if (alimento) {
+          await api.post('/progresso/', { crianca_id: criancaId, alimento_id: alimento.id, status: 'Aceita' });
+        }
+      }
+
+      await adicionarFilho({
+        nome, dataNasc, sexo, alergias,
+        neuro: neuroFinal.join(', '),
         alimentosSelecionados,
       });
+
       router.replace('/(tabs)/home');
-    } catch (error) {
-      Alert.alert('Erro', 'Não foi possível salvar. Tente novamente.');
+    } catch (error: any) {
+      console.error('Erro ao salvar:', error?.response?.data || error.message);
+      Alert.alert('Erro', 'Não foi possível salvar os dados no servidor. Verifique a conexão.');
     } finally {
       setSalvando(false);
     }
@@ -144,70 +204,41 @@ export default function OnboardingFilho() {
   );
 
   const ArrowButton = ({ onPress, disabled = false }: any) => (
-    <TouchableOpacity
-      style={[styles.fab, disabled && { opacity: 0.3 }]}
-      onPress={onPress}
-      disabled={disabled}
-      activeOpacity={0.8}
-    >
+    <TouchableOpacity style={[styles.fab, disabled && { opacity: 0.3 }]} onPress={onPress} disabled={disabled} activeOpacity={0.8}>
       <MaterialCommunityIcons name="arrow-right" size={30} color="#fff" />
     </TouchableOpacity>
   );
 
-  // Step 0 — Nome
   if (step === 0) return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
       <Text style={styles.questionText}>Qual o nome do seu pequeno?</Text>
       <View style={styles.inputBlock}>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Como devemos chamar?"
-          placeholderTextColor="#5e5c5480"
-          value={nome}
-          onChangeText={setNome}
-          autoFocus
-        />
+        <TextInput style={styles.textInput} placeholder="Como devemos chamar?" placeholderTextColor="#5e5c5480" value={nome} onChangeText={setNome} autoFocus />
       </View>
       <ArrowButton onPress={nextStep} disabled={!nome} />
     </SafeAreaView>
   );
 
-  // Step 1 — Data de nascimento
   if (step === 1) return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
       <Text style={styles.questionText}>Quando {nome} nasceu?</Text>
       <View style={styles.inputBlock}>
-        <MaskInput
-          style={styles.textInput}
-          placeholder="DD / MM / AAAA"
-          placeholderTextColor="#5e5c5480"
-          keyboardType="numeric"
-          maxLength={10}
-          value={dataNasc}
-          mask={dataMask}
-          onChangeText={(masked) => setDataNasc(masked)}
-        />
+        <MaskInput style={styles.textInput} placeholder="DD / MM / AAAA" placeholderTextColor="#5e5c5480" keyboardType="numeric" maxLength={10} value={dataNasc} mask={dataMask} onChangeText={(masked) => setDataNasc(masked)} />
         <MaterialCommunityIcons name="calendar-month-outline" size={20} color="#5e5c54" />
       </View>
       <ArrowButton onPress={nextStep} disabled={dataNasc.length < 10} />
     </SafeAreaView>
   );
 
-  // Step 2 — Sexo
   if (step === 2) return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
       <Text style={styles.questionText}>Qual o sexo biológico?</Text>
       <View style={styles.optionsCol}>
         {['Feminino', 'Masculino'].map((opt) => (
-          <TouchableOpacity
-            key={opt}
-            activeOpacity={0.7}
-            style={[styles.optBtn, sexo === opt && styles.optBtnActive]}
-            onPress={() => setSexo(opt)}
-          >
+          <TouchableOpacity key={opt} activeOpacity={0.7} style={[styles.optBtn, sexo === opt && styles.optBtnActive]} onPress={() => setSexo(opt)}>
             <Text style={[styles.optText, sexo === opt && styles.optTextActive]}>{opt}</Text>
           </TouchableOpacity>
         ))}
@@ -216,27 +247,18 @@ export default function OnboardingFilho() {
     </SafeAreaView>
   );
 
-  // Step 3 — Alergias
   if (step === 3) return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
       <Text style={styles.questionText}>Alguma alergia alimentar?</Text>
       <Text style={styles.questionSub}>Opcional — liste as alergias conhecidas</Text>
       <View style={styles.inputBlock}>
-        <TextInput
-          style={[styles.textInput, { minHeight: 80, textAlignVertical: 'top' }]}
-          placeholder="Ex: Amendoim, Lactose, Glúten..."
-          placeholderTextColor="#5e5c5480"
-          value={alergias}
-          onChangeText={setAlergias}
-          multiline
-        />
+        <TextInput style={[styles.textInput, { minHeight: 80, textAlignVertical: 'top' }]} placeholder="Ex: Amendoim, Lactose, Glúten..." placeholderTextColor="#5e5c5480" value={alergias} onChangeText={setAlergias} multiline />
       </View>
       <ArrowButton onPress={nextStep} />
     </SafeAreaView>
   );
 
-  // Step 4 — Neurodivergência
   if (step === 4) return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
@@ -244,50 +266,27 @@ export default function OnboardingFilho() {
       <Text style={styles.questionSub}>Opcional — selecione todas que se aplicam</Text>
       <View style={styles.optionsGrid}>
         {['TEA', 'TDAH', 'Transtorno de Ansiedade', 'TARE', 'Outra', 'Nenhuma'].map((opcao) => (
-          <TouchableOpacity
-            key={opcao}
-            activeOpacity={0.7}
-            style={[styles.neuroBtn, neuro.includes(opcao) && styles.neuroBtnActive]}
-            onPress={() => toggleNeuro(opcao)}
-          >
-            <Text style={[styles.neuroText, neuro.includes(opcao) && styles.neuroTextActive]}>
-              {opcao}
-            </Text>
+          <TouchableOpacity key={opcao} activeOpacity={0.7} style={[styles.neuroBtn, neuro.includes(opcao) && styles.neuroBtnActive]} onPress={() => toggleNeuro(opcao)}>
+            <Text style={[styles.neuroText, neuro.includes(opcao) && styles.neuroTextActive]}>{opcao}</Text>
           </TouchableOpacity>
         ))}
       </View>
       {neuro.includes('Outra') && (
         <View style={[styles.inputBlock, { marginTop: 20 }]}>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Qual neurodivergência?"
-            placeholderTextColor="#5e5c5480"
-            value={outraNeuro}
-            onChangeText={setOutraNeuro}
-            autoFocus
-          />
+          <TextInput style={styles.textInput} placeholder="Qual neurodivergência?" placeholderTextColor="#5e5c5480" value={outraNeuro} onChangeText={setOutraNeuro} autoFocus />
         </View>
       )}
       <ArrowButton onPress={nextStep} />
     </SafeAreaView>
   );
 
-  // Step 5 — Alimentos
   return (
     <SafeAreaView style={styles.fullScreen}>
       <Header />
       <Text style={styles.questionText}>O que {nome} já come bem?</Text>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.grid}>
         {ALIMENTOS.map((item) => (
-          <TouchableOpacity
-            key={item.name}
-            activeOpacity={0.7}
-            style={[
-              styles.foodCard,
-              alimentosSelecionados.includes(item.name) && styles.foodCardActive,
-            ]}
-            onPress={() => toggleAlimento(item.name)}
-          >
+          <TouchableOpacity key={item.name} activeOpacity={0.7} style={[styles.foodCard, alimentosSelecionados.includes(item.name) && styles.foodCardActive]} onPress={() => toggleAlimento(item.name)}>
             <View style={[styles.iconCircle, { backgroundColor: item.color }]}>
               {IMAGENS_ALIMENTOS[item.name] ? (
                 <Image source={IMAGENS_ALIMENTOS[item.name]} style={styles.foodImage} />
@@ -295,26 +294,14 @@ export default function OnboardingFilho() {
                 <MaterialCommunityIcons name={item.icon as any} size={30} color="#904c1f" />
               )}
             </View>
-            <Text style={[
-              styles.foodLabel,
-              alimentosSelecionados.includes(item.name) && styles.foodLabelActive,
-            ]}>
-              {item.name}
-            </Text>
+            <Text style={[styles.foodLabel, alimentosSelecionados.includes(item.name) && styles.foodLabelActive]}>{item.name}</Text>
           </TouchableOpacity>
         ))}
         <View style={{ height: 100 }} />
       </ScrollView>
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.finishBtn, salvando && { opacity: 0.6 }]}
-          onPress={handleFinalizar}
-          disabled={salvando}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.finishText}>
-            {salvando ? 'Salvando...' : 'Adicionar filho'}
-          </Text>
+        <TouchableOpacity style={[styles.finishBtn, salvando && { opacity: 0.6 }]} onPress={handleFinalizar} disabled={salvando} activeOpacity={0.8}>
+          <Text style={styles.finishText}>{salvando ? 'Salvando...' : 'Adicionar filho'}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -330,15 +317,15 @@ const styles = StyleSheet.create({
   progressContainer: { flex: 1, height: 6, backgroundColor: '#e4e3d9', borderRadius: 3, overflow: 'hidden' },
   progressBar: { height: '100%', backgroundColor: '#b22300' },
   questionText: { fontSize: 32, fontWeight: '800', color: '#1b1c16', marginBottom: 30 },
-  inputBlock: { backgroundColor: '#eae8de', borderRadius: 20, padding: 22, flexDirection: 'row', alignItems: 'center' },
-  textInput: { flex: 1, fontSize: 18, color: '#1b1c16', fontWeight: '500' },
-  fab: { position: 'absolute', bottom: 40, right: 30, width: 70, height: 70, borderRadius: 35, backgroundColor: '#b22300', justifyContent: 'center', alignItems: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 4 },
   questionSub: { fontSize: 14, color: '#5e5c54', marginBottom: 20, marginTop: -20 },
   optionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   neuroBtn: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 100, backgroundColor: '#fff', borderWidth: 2, borderColor: '#e4e3d9', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 1 },
   neuroBtnActive: { backgroundColor: '#b22300', borderColor: '#b22300' },
   neuroText: { fontSize: 15, fontWeight: '600', color: '#1b1c16' },
   neuroTextActive: { color: '#fff' },
+  inputBlock: { backgroundColor: '#eae8de', borderRadius: 20, padding: 22, flexDirection: 'row', alignItems: 'center' },
+  textInput: { flex: 1, fontSize: 18, color: '#1b1c16', fontWeight: '500' },
+  fab: { position: 'absolute', bottom: 40, right: 30, width: 70, height: 70, borderRadius: 35, backgroundColor: '#b22300', justifyContent: 'center', alignItems: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 4 },
   optionsCol: { gap: 15 },
   optBtn: { backgroundColor: '#fff', padding: 25, borderRadius: 24, alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 3 },
   optBtnActive: { backgroundColor: '#b22300' },

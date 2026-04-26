@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://ipv4:8000'; // Em produção, troque pelo IP/domínio real, Se estiver testando em celular físico 
+const API_BASE_URL = 'http://192.168.1.12:8000'; // Em produção, troque pelo IP/domínio real, Se estiver testando em celular físico 
                                               // ou emulador Android, troque localhost pelo IP da sua máquina na rede (ex: 192.168.1.10), 
                                               // porque o celular não reconhece localhost como sendo o seu PC
 

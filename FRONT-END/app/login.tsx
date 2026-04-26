@@ -13,12 +13,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Filho, useFilhos } from '../context/FilhosContext';
+import { supabase } from '../services/supabase';
 
 const { width, height } = Dimensions.get('window');
 const PATTERN_HEIGHT = height * 0.42;
 const TILE_SIZE = 200;
 
-// Padrão de cajus repetido como tiles
 function CajuPattern({ tileHeight }: { tileHeight: number }) {
   const cols = Math.ceil(width / TILE_SIZE) + 1;
   const rows = Math.ceil(tileHeight / TILE_SIZE) + 1;
@@ -47,19 +48,62 @@ function CajuPattern({ tileHeight }: { tileHeight: number }) {
 
 export default function Login() {
   const router = useRouter();
+  const { injetarFilhos } = useFilhos();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [senhaVisivel, setSenhaVisivel] = useState(false);
   const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState('');
 
   const handleLogin = async () => {
     setCarregando(true);
+    setErro('');
     try {
-      // ✅ Conectar à API de autenticação aqui
-      // const response = await fetch('https://sua-api.com/auth/login', { ... });
-      router.replace('/(tabs)/home');
-    } catch (error) {
-      console.error('Erro ao fazer login:', error);
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: senha,
+      });
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          setErro('E-mail ou senha incorretos.');
+        } else if (error.message.includes('Email not confirmed')) {
+          setErro('Confirme seu e-mail antes de entrar.');
+        } else if (error.message.includes('Too many requests')) {
+          setErro('Muitas tentativas. Aguarde alguns minutos.');
+        } else {
+          setErro('Ocorreu um erro. Tente novamente.');
+        }
+        return;
+      }
+
+      const userId = authData.user?.id;
+      if (!userId) throw new Error('Sessão inválida.');
+
+      const { data: criancas } = await supabase
+        .from('criancas')
+        .select('id, nome, data_nascimento, sexo')
+        .eq('cuidador_id', userId);
+
+      if (criancas && criancas.length > 0) {
+        const filhos: Filho[] = criancas.map(c => ({
+          id: c.id,
+          nome: c.nome ?? '',
+          dataNasc: c.data_nascimento
+            ? c.data_nascimento.split('-').reverse().join('/')
+            : '',
+          sexo: c.sexo ?? '',
+          alergias: '',
+          neuro: '',
+          alimentosSelecionados: [],
+          criadoEm: c.data_nascimento ?? new Date().toISOString(),
+        }));
+        await injetarFilhos(filhos);
+        router.replace('/(tabs)/home');
+      } else {
+        router.replace('/');
+      }
+    } catch {
+      setErro('Ocorreu um erro. Tente novamente.');
     } finally {
       setCarregando(false);
     }
@@ -100,7 +144,7 @@ export default function Login() {
               placeholder="seu@email.com"
               placeholderTextColor="rgba(94,92,84,0.4)"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={t => { setEmail(t); setErro(''); }}
               keyboardType="email-address"
               autoCapitalize="none"
             />
@@ -114,7 +158,7 @@ export default function Login() {
               placeholder="••••••••"
               placeholderTextColor="rgba(94,92,84,0.4)"
               value={senha}
-              onChangeText={setSenha}
+              onChangeText={t => { setSenha(t); setErro(''); }}
               secureTextEntry={!senhaVisivel}
             />
             <TouchableOpacity activeOpacity={0.7} onPress={() => setSenhaVisivel(!senhaVisivel)}>
@@ -129,6 +173,13 @@ export default function Login() {
           <TouchableOpacity activeOpacity={0.7} style={styles.esqueciWrap} onPress={() => router.push('/recuperar-senha' as any)}>
             <Text style={styles.esqueciText}>ESQUECI MINHA SENHA</Text>
           </TouchableOpacity>
+
+          {erro ? (
+            <View style={styles.erroBox}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#b22300" />
+              <Text style={styles.erroText}>{erro}</Text>
+            </View>
+          ) : null}
 
           <TouchableOpacity
             activeOpacity={0.85}
@@ -186,8 +237,19 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   input: { flex: 1, fontSize: 15, color: '#1b1c16' },
-  esqueciWrap: { alignSelf: 'flex-end', marginBottom: 28, marginTop: -8 },
+  esqueciWrap: { alignSelf: 'flex-end', marginBottom: 20, marginTop: -8 },
   esqueciText: { fontSize: 11, fontWeight: '600', color: '#904c1f', letterSpacing: 0.8 },
+  erroBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#fff5f3',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  erroText: { flex: 1, fontSize: 13, color: '#b22300', lineHeight: 18 },
   entrarBtn: {
     backgroundColor: '#b22300',
     flexDirection: 'row',

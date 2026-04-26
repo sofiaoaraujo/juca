@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { FilhosProvider } from '../context/FilhosContext';
+import { supabase } from '../services/supabase';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -16,14 +17,24 @@ export default function RootLayout() {
   const router = useRouter();
 
   useEffect(() => {
-    AsyncStorage.getItem('@juca:filhos').then(v => {
-      const filhos = v ? JSON.parse(v) : [];
-      if (filhos.length > 0) {
-        router.replace('/(tabs)/home');
-      } else {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        router.replace('/login');
+        return;
+      }
+      AsyncStorage.getItem('@juca:filhos').then(v => {
+        const filhos = v ? JSON.parse(v) : [];
+        router.replace(filhos.length > 0 ? '/(tabs)/home' : '/');
+      });
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
         router.replace('/login');
       }
     });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   return (

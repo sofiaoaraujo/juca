@@ -1,5 +1,4 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -20,6 +19,7 @@ import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../../context/FilhosContext';
 import { obterSugestoesFoodChaining, type SugestaoAlimento } from '../../services/gemini';
+import { supabase } from '../../services/supabase';
 
 const { width, height } = Dimensions.get('window');
 const TRILHA_WIDTH = width - 48;
@@ -397,16 +397,14 @@ export default function Home() {
   const [sugestoes, setSugestoes] = useState<AlimentoSugerido[]>([]);
   const [carregandoSugestoes, setCarregandoSugestoes] = useState(false);
   const carregarSugestoes = async () => {
-    if (!filhoAtivo || carregandoSugestoes) return;
+    
+    if (!filhoAtivo?.id) return;
+        
     setCarregandoSugestoes(true);
     try {
-      const alimentosAceitos = filhoAtivo.alimentosSelecionados ?? [];
-      const resultado = await obterSugestoesFoodChaining(
-        filhoAtivo.nome,
-        filhoAtivo.alergias ?? '',
-        filhoAtivo.neuro ?? '',
-        alimentosAceitos,
-      );
+      // ✅ Chamada simplificada enviando apenas o ID!
+      const resultado = await obterSugestoesFoodChaining(filhoAtivo.id);
+      
       const comCores = resultado.map(s => {
         const cores = CORES_CATEGORIA[s.categoria] ?? CORES_CATEGORIA.default;
         return { ...s, icon: cores.icon, corFundo: cores.fundo, corIcone: cores.icone };
@@ -419,6 +417,7 @@ export default function Home() {
       setCarregandoSugestoes(false);
     }
   };
+  
   const [trilhaVisivel, setTrilhaVisivel] = useState(false);
   const [etapasConcluidas, setEtapasConcluidas] = useState<string[]>([]);
   const [fotosSessao, setFotosSessao] = useState<string[]>([]);
@@ -426,7 +425,10 @@ export default function Home() {
   const confettiHomeRef = useRef<any>(null);
 
   useEffect(() => {
-    AsyncStorage.getItem('@juca:nomeUsuario').then(v => { if (v) setNomeUsuario(v); });
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      const nome = user?.user_metadata?.nome;
+      if (nome) setNomeUsuario(nome);
+    });
   }, []);
 
   useEffect(() => {
