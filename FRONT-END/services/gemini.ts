@@ -1,6 +1,6 @@
 // services/gemini.ts
 // Substitua pelo IP que você encontrou no Passo 1!
-const BACKEND_URL = 'http://ipv4:8000'; 
+const BACKEND_URL = 'http://192.168.1.12:8000'; 
 
 export type SugestaoAlimento = {
   id: string;

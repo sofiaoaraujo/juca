@@ -168,7 +168,7 @@ export default function OnboardingFilho() {
         alergias,
         neuro: neuro.join(', '), // Transforma o array em texto pro contexto visual do App
         alimentosSelecionados,
-      });
+      }, criancaId); // usa o id real do banco para garantir sync no delete/edit
 
       router.replace('/(tabs)/home');
 
