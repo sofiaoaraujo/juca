@@ -15,6 +15,7 @@ import MaskInput from 'react-native-mask-input';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../context/FilhosContext';
 import api from '../services/api'; // <-- IMPORTAÇÃO DA API AQUI
+import { supabase } from '../services/supabase';
 
 const dataMask = [/\d/, /\d/, '/', /\d/, /\d/, '/', /\d/, /\d/, /\d/, /\d/];
 const { width } = Dimensions.get('window');
@@ -83,6 +84,9 @@ export default function OnboardingFilho() {
   const handleFinalizar = async () => {
     setSalvando(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado.');
+
       // 1. CRIAR A CRIANÇA
       const dataFormatada = dataNasc.split('/').reverse().join('-');
 
@@ -90,7 +94,7 @@ export default function OnboardingFilho() {
         nome: nome,
         data_nascimento: dataFormatada,
         sexo: sexo,
-        cuidador_id: 'de8ea771-326e-470c-a2a3-f2ef5425a53f', // ID mockado por enquanto
+        cuidador_id: user.id,
       });
 
       const criancaId = responseCrianca.data.id;
@@ -156,8 +160,8 @@ export default function OnboardingFilho() {
         }
       }
 
-      // 5. RECARREGAR FILHOS NO CONTEXTO PARA INCLUIR O NOVO FILHO CRIADO
-      await recarregar(); // Recarrega os filhos do contexto para incluir o novo filho criado
+      // 5. SALVAR NO CONTEXTO LOCAL E REDIRECIONAR
+      await recarregar();
 
       router.replace('/(tabs)/home');
 

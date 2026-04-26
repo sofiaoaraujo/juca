@@ -2,8 +2,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import api from '../services/api';
 
-// TODO: login
-const DEV_CUIDADOR_ID = 'de8ea771-326e-470c-a2a3-f2ef5425a53f'; 
+// TODO : ! AINDA PRECISAMOS DO LOGIN, O ID DAQUI É O UUID GERADO NO CADASTRO !
+import { supabase } from '../services/supabase';
+
+// ! SE TIVER DANDO ERRADO USE O ID FIXO DE UM CUIDADOR QUE VOCÊ ENCONTROU NO BANCO DE DADOS, SÓ PRA TESTAR MESMO
+// ! E VÁ PARA A LINHA recarregar, lá terá mais intruções
+// * const DEV_CUIDADOR_ID = '94d656c5-513f-49bd-bb8b-e005f33c9b29'; 
 
 export type Filho = {
   id: string;
@@ -80,10 +84,15 @@ export function FilhosProvider({ children }: { children: React.ReactNode }) {
   const [filhoAtivo, setFilhoAtivoState] = useState<Filho | null>(null);
   const [carregando, setCarregando] = useState(true);
 
-  // Carrega do storage
-  const recarregar = useCallback(async () => {
+  // Carrega 
+   const recarregar = useCallback(async () => {
     try {
-      const res = await api.get(`/criancas/cuidador/${DEV_CUIDADOR_ID}`);
+
+      // * -----------------------
+      const { data: { user } } = await supabase.auth.getUser();  // ! Se estiver dando errado, troque essas duas por e lá em cima habilite o código perto dos imports
+      if (!user) return;                                         // "const res = await api.get(`/criancas/cuidador/${DEV_CUIDADOR_ID}`);"
+      // * -----------------------
+      const res = await api.get(`/criancas/cuidador/${user.id}`);
       const lista: Filho[] = res.data.map(mapearFilho);
       setFilhos(lista);
 
