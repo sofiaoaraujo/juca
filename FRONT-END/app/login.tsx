@@ -1,5 +1,4 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -14,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Filho, useFilhos } from '../context/FilhosContext';
 import { supabase } from '../services/supabase';
 
 const { width, height } = Dimensions.get('window');
@@ -48,6 +48,7 @@ function CajuPattern({ tileHeight }: { tileHeight: number }) {
 
 export default function Login() {
   const router = useRouter();
+  const { injetarFilhos } = useFilhos();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [senhaVisivel, setSenhaVisivel] = useState(false);
@@ -58,7 +59,7 @@ export default function Login() {
     setCarregando(true);
     setErro('');
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: senha,
       });
@@ -74,9 +75,33 @@ export default function Login() {
         }
         return;
       }
-      const v = await AsyncStorage.getItem('@juca:filhos');
-      const filhos = v ? JSON.parse(v) : [];
-      router.replace(filhos.length > 0 ? '/(tabs)/home' : '/');
+
+      const userId = authData.user?.id;
+      if (!userId) throw new Error('Sessão inválida.');
+
+      const { data: criancas } = await supabase
+        .from('criancas')
+        .select('id, nome, data_nascimento, sexo')
+        .eq('cuidador_id', userId);
+
+      if (criancas && criancas.length > 0) {
+        const filhos: Filho[] = criancas.map(c => ({
+          id: c.id,
+          nome: c.nome ?? '',
+          dataNasc: c.data_nascimento
+            ? c.data_nascimento.split('-').reverse().join('/')
+            : '',
+          sexo: c.sexo ?? '',
+          alergias: '',
+          neuro: '',
+          alimentosSelecionados: [],
+          criadoEm: c.data_nascimento ?? new Date().toISOString(),
+        }));
+        await injetarFilhos(filhos);
+        router.replace('/(tabs)/home');
+      } else {
+        router.replace('/');
+      }
     } catch {
       setErro('Ocorreu um erro. Tente novamente.');
     } finally {
