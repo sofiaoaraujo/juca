@@ -72,9 +72,13 @@ export default function Configuracoes() {
       Alert.alert('Nome incorreto', 'Digite o nome exato da criança para confirmar.');
       return;
     }
-    await removerFilho(filhoExcluindo.id);
-    setModalExcluir(false);
-    setFilhoExcluindo(null);
+    try {
+      await removerFilho(filhoExcluindo.id);
+      setModalExcluir(false);
+      setFilhoExcluindo(null);
+    } catch {
+      Alert.alert('Erro ao excluir', 'Não foi possível excluir a criança. Verifique sua conexão e tente novamente.');
+    }
   };
 
   const calcularIdade = (dataNasc: string): string => {

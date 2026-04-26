@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { supabase } from '../services/supabase';
 
 export type Filho = {
   id: string;
@@ -18,7 +19,7 @@ type FilhosContextType = {
   filhoAtivo: Filho | null;
   carregando: boolean;
   setFilhoAtivo: (filho: Filho) => Promise<void>;
-  adicionarFilho: (dados: Omit<Filho, 'id' | 'criadoEm'>) => Promise<Filho>;
+  adicionarFilho: (dados: Omit<Filho, 'id' | 'criadoEm'>, id?: string) => Promise<Filho>;
   editarFilho: (id: string, dados: Partial<Filho>) => Promise<void>;
   removerFilho: (id: string) => Promise<void>;
   recarregar: () => Promise<void>;
@@ -58,11 +59,11 @@ export function FilhosProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(ATIVO_KEY, filho.id);
   }, []);
 
-  // Adicionar filho (AGORA GERA UM UUID REAL DO TIPO BANCO DE DADOS)
-  const adicionarFilho = useCallback(async (dados: Omit<Filho, 'id' | 'criadoEm'>) => {
+  // Adicionar filho — usa o id do banco quando fornecido, senão gera um UUID local
+  const adicionarFilho = useCallback(async (dados: Omit<Filho, 'id' | 'criadoEm'>, id?: string) => {
     const novo: Filho = {
       ...dados,
-      id: Crypto.randomUUID(), // <-- SOLUÇÃO DEFINITIVA PARA NOVOS CADASTROS
+      id: id ?? Crypto.randomUUID(),
       criadoEm: new Date().toISOString(),
     };
     const novaLista = [...filhos, novo];
@@ -86,6 +87,9 @@ export function FilhosProvider({ children }: { children: React.ReactNode }) {
 
   // Remover filho
   const removerFilho = useCallback(async (id: string) => {
+    const { error } = await supabase.from('criancas').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+
     const novaLista = filhos.filter(f => f.id !== id);
     setFilhos(novaLista);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(novaLista));
