@@ -15,6 +15,7 @@ import MaskInput from 'react-native-mask-input';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../context/FilhosContext';
 import api from '../services/api'; // <-- IMPORTAÇÃO DA API AQUI
+import { supabase } from '../services/supabase';
 
 const dataMask = [/\d/, /\d/, '/', /\d/, /\d/, '/', /\d/, /\d/, /\d/, /\d/];
 const { width } = Dimensions.get('window');
@@ -83,6 +84,9 @@ export default function OnboardingFilho() {
   const handleFinalizar = async () => {
     setSalvando(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado.');
+
       // 1. CRIAR A CRIANÇA
       const dataFormatada = dataNasc.split('/').reverse().join('-');
 
@@ -90,7 +94,7 @@ export default function OnboardingFilho() {
         nome: nome,
         data_nascimento: dataFormatada,
         sexo: sexo,
-        cuidador_id: '286fc67f-882c-495e-b912-5d199d387761', // ID mockado por enquanto
+        cuidador_id: user.id,
       });
 
       const criancaId = responseCrianca.data.id;
