@@ -150,8 +150,22 @@ export default function OnboardingFilho() {
       // 4. VINCULAR ALIMENTOS INICIAIS
       const alimentosDB = await api.get('/alimentos/');
       for (const nomeAlimento of alimentosSelecionados) {
-        const alimento = alimentosDB.data.find((a: any) => a.nome === nomeAlimento);
-        if (alimento) {
+        // Busca case-insensitive para tolerar variações de capitalização/acentuação
+        let alimento = alimentosDB.data.find(
+          (a: any) => a.nome.toLowerCase().trim() === nomeAlimento.toLowerCase().trim()
+        );
+
+        // Se não encontrou no catálogo, cria o alimento antes de vincular
+        if (!alimento) {
+          try {
+            const novoAlimento = await api.post('/alimentos/', { nome: nomeAlimento });
+            alimento = novoAlimento.data;
+          } catch {
+            continue;
+          }
+        }
+
+        if (alimento?.id) {
           await api.post('/progresso/', {
             crianca_id: criancaId,
             alimento_id: alimento.id,
