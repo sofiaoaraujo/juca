@@ -51,6 +51,15 @@ const ETAPAS_SOS: SOSEtapa[] = [
   { id: 'comer', label: 'Comer', descricao: 'Mastigar e engolir o alimento', icon: 'check-circle-outline', dica: 'Grande conquista! Tire uma foto para guardar esse momento especial!', ehFinal: true },
 ];
 
+const STATUS_TO_ETAPA: Record<string, string> = {
+  'Tolerar': 'tolerar',
+  'Interagir': 'interagir',
+  'Cheirar': 'cheirar',
+  'Tocar': 'beijar',
+  'Saborear': 'morder',
+  'Comer': 'comer',
+};
+
 const POSICOES_X = [
   TRILHA_WIDTH * 0.18,
   TRILHA_WIDTH * 0.55,
@@ -419,6 +428,7 @@ export default function Home() {
   
   const [trilhaVisivel, setTrilhaVisivel] = useState(false);
   const [etapasConcluidas, setEtapasConcluidas] = useState<string[]>([]);
+  const [etapasAnteriores, setEtapasAnteriores] = useState<string[]>([]);
   const [fotosSessao, setFotosSessao] = useState<string[]>([]);
   const [salvando, setSalvando] = useState(false);
   const confettiHomeRef = useRef<any>(null);
@@ -434,11 +444,28 @@ export default function Home() {
     if (filhoAtivo) carregarSugestoes();
   }, [filhoAtivo?.id]);
 
-  const abrirTrilha = (alimento: AlimentoSugerido) => {
+  const abrirTrilha = async (alimento: AlimentoSugerido) => {
     setAlimentoAtivo(alimento);
     setEtapasConcluidas([]);
     setFotosSessao([]);
     setTrilhaVisivel(true);
+    if (filhoAtivo?.id && alimento.id) {
+      try {
+        const { data } = await supabase
+          .from('crianca_alimento')
+          .select('status')
+          .eq('crianca_id', filhoAtivo.id)
+          .eq('alimento_id', alimento.id);
+        const etapas = [...new Set(
+          (data ?? []).map((r: any) => STATUS_TO_ETAPA[r.status]).filter(Boolean)
+        )];
+        setEtapasAnteriores(etapas);
+      } catch {
+        setEtapasAnteriores([]);
+      }
+    } else {
+      setEtapasAnteriores([]);
+    }
   };
 
   const fecharTrilha = () => {
@@ -446,6 +473,7 @@ export default function Home() {
     setAlimentoAtivo(null);
     setEtapasConcluidas([]);
     setFotosSessao([]);
+    setEtapasAnteriores([]);
   };
 
   const onEtapaConcluida = (id: string, foto?: string) => {
@@ -469,6 +497,8 @@ export default function Home() {
       setSalvando(false);
     }
   };
+
+  const etapasTotais = [...new Set([...etapasAnteriores, ...etapasConcluidas])];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -592,9 +622,9 @@ export default function Home() {
 
           <View style={styles.progressBarRow}>
             <View style={styles.progressBarTrack}>
-              <View style={[styles.progressBarFill, { width: `${(etapasConcluidas.length / ETAPAS_SOS.length) * 100}%` }]} />
+              <View style={[styles.progressBarFill, { width: `${(etapasTotais.length / ETAPAS_SOS.length) * 100}%` }]} />
             </View>
-            <Text style={styles.progressBarLabel}>{etapasConcluidas.length}/{ETAPAS_SOS.length}</Text>
+            <Text style={styles.progressBarLabel}>{etapasTotais.length}/{ETAPAS_SOS.length}</Text>
           </View>
 
           <Text style={styles.instrucao}>
@@ -603,7 +633,7 @@ export default function Home() {
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
             <TrilhaSOS
-              etapasConcluidas={etapasConcluidas}
+              etapasConcluidas={etapasTotais}
               onEtapaConcluida={onEtapaConcluida}
               onSalvar={salvarSessao}
               salvando={salvando}

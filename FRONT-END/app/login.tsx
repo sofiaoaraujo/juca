@@ -84,17 +84,28 @@ export default function Login() {
         .select('id, nome, data_nascimento, sexo')
         .eq('cuidador_id', userId);
 
-      const filhos: Filho[] = (criancas ?? []).map(c => ({
-        id: c.id,
-        nome: c.nome ?? '',
-        dataNasc: c.data_nascimento
-          ? c.data_nascimento.split('-').reverse().join('/')
-          : '',
-        sexo: c.sexo ?? '',
-        alergias: '',
-        neuro: '',
-        alimentosSelecionados: [],
-        criadoEm: c.data_nascimento ?? new Date().toISOString(),
+      const filhos: Filho[] = await Promise.all((criancas ?? []).map(async c => {
+        const { data: progressos } = await supabase
+          .from('crianca_alimento')
+          .select('alimentos(nome)')
+          .eq('crianca_id', c.id);
+
+        const alimentosSelecionados = [...new Set(
+          (progressos ?? []).map((p: any) => p.alimentos?.nome).filter(Boolean)
+        )] as string[];
+
+        return {
+          id: c.id,
+          nome: c.nome ?? '',
+          dataNasc: c.data_nascimento
+            ? c.data_nascimento.split('-').reverse().join('/')
+            : '',
+          sexo: c.sexo ?? '',
+          alergias: '',
+          neuro: '',
+          alimentosSelecionados,
+          criadoEm: c.data_nascimento ?? new Date().toISOString(),
+        };
       }));
       await injetarFilhos(filhos); // sempre, mesmo lista vazia
       router.replace(filhos.length > 0 ? '/(tabs)/home' : '/onboarding-filho');
