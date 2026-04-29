@@ -5,3 +5,5 @@ pydantic
 pydantic-settings
 python-dotenv
 pydantic[email]
+pytest
+httpx
