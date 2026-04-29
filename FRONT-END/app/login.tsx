@@ -84,24 +84,20 @@ export default function Login() {
         .select('id, nome, data_nascimento, sexo')
         .eq('cuidador_id', userId);
 
-      if (criancas && criancas.length > 0) {
-        const filhos: Filho[] = criancas.map(c => ({
-          id: c.id,
-          nome: c.nome ?? '',
-          dataNasc: c.data_nascimento
-            ? c.data_nascimento.split('-').reverse().join('/')
-            : '',
-          sexo: c.sexo ?? '',
-          alergias: '',
-          neuro: '',
-          alimentosSelecionados: [],
-          criadoEm: c.data_nascimento ?? new Date().toISOString(),
-        }));
-        await injetarFilhos(filhos);
-        router.replace('/(tabs)/home');
-      } else {
-        router.replace('/onboarding-filho');
-      }
+      const filhos: Filho[] = (criancas ?? []).map(c => ({
+        id: c.id,
+        nome: c.nome ?? '',
+        dataNasc: c.data_nascimento
+          ? c.data_nascimento.split('-').reverse().join('/')
+          : '',
+        sexo: c.sexo ?? '',
+        alergias: '',
+        neuro: '',
+        alimentosSelecionados: [],
+        criadoEm: c.data_nascimento ?? new Date().toISOString(),
+      }));
+      await injetarFilhos(filhos); // sempre, mesmo lista vazia
+      router.replace(filhos.length > 0 ? '/(tabs)/home' : '/onboarding-filho');
     } catch {
       setErro('Ocorreu um erro. Tente novamente.');
     } finally {
