@@ -100,7 +100,7 @@ export default function Login() {
         await injetarFilhos(filhos);
         router.replace('/(tabs)/home');
       } else {
-        router.replace('/');
+        router.replace('/onboarding-filho');
       }
     } catch {
       setErro('Ocorreu um erro. Tente novamente.');

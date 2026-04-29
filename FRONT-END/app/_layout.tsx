@@ -24,7 +24,7 @@ export default function RootLayout() {
       }
       AsyncStorage.getItem('@juca:filhos').then(v => {
         const filhos = v ? JSON.parse(v) : [];
-        router.replace(filhos.length > 0 ? '/(tabs)/home' : '/');
+        router.replace(filhos.length > 0 ? '/(tabs)/home' : '/onboarding-filho');
       });
     });
 
