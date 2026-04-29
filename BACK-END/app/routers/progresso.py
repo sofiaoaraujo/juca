@@ -220,3 +220,37 @@ async def buscar_progresso_especifico(crianca_id: UUID, alimento_id: UUID):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao buscar progresso: {str(e)}",
         )
+
+
+# ---------------------------------------------------------------------------
+# GET /progresso/crianca/{crianca_id}/alimento/{alimento_id}/etapas
+# Listar etapas concluídas de uma criança com um alimento
+# ---------------------------------------------------------------------------
+@router.get(
+    "/crianca/{crianca_id}/alimento/{alimento_id}/etapas",
+    response_model=List[str],
+    summary="Listar etapas SOS concluídas para uma criança com um alimento",
+)
+async def listar_etapas_concluidas(crianca_id: UUID, alimento_id: UUID):
+    """
+    Retorna a lista de status únicos já registrados para um par criança+alimento.
+    Retorna lista vazia se nenhum progresso existir (não lança 404).
+    Usado pelo frontend para restaurar o estado visual da Trilha SOS.
+    """
+    try:
+        resposta = (
+            supabase.table("crianca_alimento")
+            .select("status")
+            .eq("crianca_id", str(crianca_id))
+            .eq("alimento_id", str(alimento_id))
+            .execute()
+        )
+
+        # Retorna lista de status únicos
+        return list({item["status"] for item in resposta.data})
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao listar etapas: {str(e)}",
+        )

@@ -32,7 +32,7 @@ export default function Configuracoes() {
           style: 'destructive',
           onPress: async () => {
             try { await supabase.auth.signOut(); } catch {}
-            await AsyncStorage.clear();
+            await AsyncStorage.multiRemove(['@juca:filhos', '@juca:filhoAtivoId', '@juca:nomeUsuario']);
             router.replace('/login');
           },
         },

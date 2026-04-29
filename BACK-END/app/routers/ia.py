@@ -29,7 +29,7 @@ async def obter_sugestao(crianca_id: str):
             supabase.table("crianca_alimento")
             .select("alimentos(id, nome, textura, cor, sabor)")
             .eq("crianca_id", crianca_id)
-            .eq("status", "Aceita")
+            .eq("status", "Comer")
             .execute()
         )
         alimentos_aceitos = [h['alimentos'] for h in historico_sucesso.data if h.get('alimentos')]

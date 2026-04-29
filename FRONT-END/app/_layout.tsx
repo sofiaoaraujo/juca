@@ -1,11 +1,10 @@
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
-import { FilhosProvider } from '../context/FilhosContext';
+import { FilhosProvider, buscarFilhosDoSupabase } from '../context/FilhosContext';
 import { supabase } from '../services/supabase';
 
 export const unstable_settings = {
@@ -17,15 +16,17 @@ export default function RootLayout() {
   const router = useRouter();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
         router.replace('/login');
         return;
       }
-      AsyncStorage.getItem('@juca:filhos').then(v => {
-        const filhos = v ? JSON.parse(v) : [];
+      try {
+        const filhos = await buscarFilhosDoSupabase(session.user.id);
         router.replace(filhos.length > 0 ? '/(tabs)/home' : '/onboarding-filho');
-      });
+      } catch {
+        router.replace('/onboarding-filho');
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {

@@ -14,6 +14,41 @@ export type Filho = {
   criadoEm: string;
 };
 
+/**
+ * Busca os filhos do cuidador autenticado diretamente do Supabase.
+ * Reutilizada pelo contexto (fallback) e pelo login.
+ */
+export async function buscarFilhosDoSupabase(userId: string): Promise<Filho[]> {
+  const { data: criancas } = await supabase
+    .from('criancas')
+    .select('id, nome, data_nascimento, sexo')
+    .eq('cuidador_id', userId);
+
+  return Promise.all((criancas ?? []).map(async (c: any) => {
+    const { data: progressos } = await supabase
+      .from('crianca_alimento')
+      .select('alimentos(nome)')
+      .eq('crianca_id', c.id);
+
+    const alimentosSelecionados = [...new Set(
+      (progressos ?? []).map((p: any) => p.alimentos?.nome).filter(Boolean)
+    )] as string[];
+
+    return {
+      id: c.id,
+      nome: c.nome ?? '',
+      dataNasc: c.data_nascimento
+        ? c.data_nascimento.split('-').reverse().join('/')
+        : '',
+      sexo: c.sexo ?? '',
+      alergias: '',
+      neuro: '',
+      alimentosSelecionados,
+      criadoEm: c.data_nascimento ?? new Date().toISOString(),
+    };
+  }));
+}
+
 type FilhosContextType = {
   filhos: Filho[];
   filhoAtivo: Filho | null;
@@ -39,7 +74,24 @@ export function FilhosProvider({ children }: { children: React.ReactNode }) {
   const recarregar = useCallback(async () => {
     try {
       const v = await AsyncStorage.getItem(STORAGE_KEY);
-      const lista: Filho[] = v ? JSON.parse(v) : [];
+      let lista: Filho[] = v ? JSON.parse(v) : [];
+
+      // Fallback: se o cache local está vazio mas há sessão autenticada,
+      // busca os filhos diretamente do Supabase e persiste localmente.
+      if (lista.length === 0) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          try {
+            lista = await buscarFilhosDoSupabase(session.user.id);
+            if (lista.length > 0) {
+              await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(lista));
+            }
+          } catch (e) {
+            console.error('Erro ao buscar filhos do Supabase (fallback):', e);
+          }
+        }
+      }
+
       setFilhos(lista);
       const ativoId = await AsyncStorage.getItem(ATIVO_KEY);
       const ativo = lista.find(f => f.id === ativoId) ?? lista[0] ?? null;

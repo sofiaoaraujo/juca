@@ -19,7 +19,7 @@ import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../../context/FilhosContext';
 import { obterSugestoesFoodChaining, type SugestaoAlimento } from '../../services/gemini';
-import { registrarEtapasSOS } from '../../services/progresso';
+import { salvarEtapaSOS, buscarEtapasSalvas } from '../../services/progresso';
 import { supabase } from '../../services/supabase';
 
 const { width, height } = Dimensions.get('window');
@@ -51,14 +51,7 @@ const ETAPAS_SOS: SOSEtapa[] = [
   { id: 'comer', label: 'Comer', descricao: 'Mastigar e engolir o alimento', icon: 'check-circle-outline', dica: 'Grande conquista! Tire uma foto para guardar esse momento especial!', ehFinal: true },
 ];
 
-const STATUS_TO_ETAPA: Record<string, string> = {
-  'Tolerar': 'tolerar',
-  'Interagir': 'interagir',
-  'Cheirar': 'cheirar',
-  'Tocar': 'beijar',
-  'Saborear': 'morder',
-  'Comer': 'comer',
-};
+// STATUS_TO_ETAPA movido para services/progresso.ts
 
 const POSICOES_X = [
   TRILHA_WIDTH * 0.18,
@@ -300,17 +293,16 @@ function TrilhaSOS({
 
       <View style={{ height: svgHeight }} />
 
-      {/* Botão salvar */}
+      {/* Botão concluir (progresso já é salvo automaticamente a cada etapa) */}
       {etapasConcluidas.length > 0 && (
         <TouchableOpacity
           activeOpacity={0.85}
-          style={[trilhaStyles.salvarBtn, salvando && { opacity: 0.5 }]}
+          style={trilhaStyles.salvarBtn}
           onPress={onSalvar}
-          disabled={salvando}
         >
-          <MaterialCommunityIcons name={todasConcluidas ? 'star' : 'content-save-outline'} size={20} color="#fff" />
+          <MaterialCommunityIcons name={todasConcluidas ? 'star' : 'check-circle-outline'} size={20} color="#fff" />
           <Text style={trilhaStyles.salvarText}>
-            {salvando ? 'Salvando...' : todasConcluidas ? 'Salvar Sessão' : 'Salvar Progresso'}
+            {todasConcluidas ? 'Concluir Trilha ⭐' : 'Fechar Trilha'}
           </Text>
         </TouchableOpacity>
       )}
@@ -450,19 +442,9 @@ export default function Home() {
     setFotosSessao([]);
     setTrilhaVisivel(true);
     if (filhoAtivo?.id && alimento.id) {
-      try {
-        const { data } = await supabase
-          .from('crianca_alimento')
-          .select('status')
-          .eq('crianca_id', filhoAtivo.id)
-          .eq('alimento_id', alimento.id);
-        const etapas = [...new Set(
-          (data ?? []).map((r: any) => STATUS_TO_ETAPA[r.status]).filter(Boolean)
-        )];
-        setEtapasAnteriores(etapas);
-      } catch {
-        setEtapasAnteriores([]);
-      }
+      // Lê etapas salvas via API backend (bypassa RLS)
+      const etapas = await buscarEtapasSalvas(filhoAtivo.id, alimento.id);
+      setEtapasAnteriores(etapas);
     } else {
       setEtapasAnteriores([]);
     }
@@ -476,26 +458,21 @@ export default function Home() {
     setEtapasAnteriores([]);
   };
 
+  // Auto-save: persiste cada etapa imediatamente ao ser concluída
   const onEtapaConcluida = (id: string, foto?: string) => {
     setEtapasConcluidas(prev => [...prev, id]);
     if (foto) setFotosSessao(prev => [...prev, foto]);
+    // Salva no banco em background (fire-and-forget com log de erro)
+    if (filhoAtivo?.id && alimentoAtivo?.id) {
+      salvarEtapaSOS(filhoAtivo.id, alimentoAtivo.id, id).catch(e =>
+        console.error('Erro ao auto-salvar etapa:', e)
+      );
+    }
   };
 
-  const salvarSessao = async () => {
-    if (!filhoAtivo?.id || !alimentoAtivo?.id) return;
-    setSalvando(true);
-    try {
-      await registrarEtapasSOS({
-        criancaId: filhoAtivo.id,
-        alimentoId: alimentoAtivo.id,
-        etapasIds: etapasConcluidas,
-      });
-      fecharTrilha();
-    } catch (error) {
-      console.error('Erro ao salvar sessão SOS:', error);
-    } finally {
-      setSalvando(false);
-    }
+  // Salvar sessão agora apenas fecha a trilha (etapas já foram auto-salvas)
+  const salvarSessao = () => {
+    fecharTrilha();
   };
 
   const etapasTotais = [...new Set([...etapasAnteriores, ...etapasConcluidas])];
