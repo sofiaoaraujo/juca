@@ -28,9 +28,10 @@ app = FastAPI(
 # Permite que o frontend (ex: React Native / Flutter) consuma a API.
 # Em produção, substitua ["*"] pelos domínios autorizados.
 # ---------------------------------------------------------------------------
+origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # Em prod: ["https://app.juca.com.br"]
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

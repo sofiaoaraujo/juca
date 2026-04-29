@@ -19,6 +19,7 @@ import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../../context/FilhosContext';
 import { obterSugestoesFoodChaining, type SugestaoAlimento } from '../../services/gemini';
+import { salvarEtapaSOS, buscarEtapasSalvas } from '../../services/progresso';
 import { supabase } from '../../services/supabase';
 
 const { width, height } = Dimensions.get('window');
@@ -49,6 +50,8 @@ const ETAPAS_SOS: SOSEtapa[] = [
   { id: 'morder', label: 'Morder', descricao: 'Dar uma mordida sem precisar engolir', icon: 'tooth-outline', dica: 'Tudo bem cuspir depois. O objetivo é o contato oral — engolir vem com o tempo!' },
   { id: 'comer', label: 'Comer', descricao: 'Mastigar e engolir o alimento', icon: 'check-circle-outline', dica: 'Grande conquista! Tire uma foto para guardar esse momento especial!', ehFinal: true },
 ];
+
+// STATUS_TO_ETAPA movido para services/progresso.ts
 
 const POSICOES_X = [
   TRILHA_WIDTH * 0.18,
@@ -290,17 +293,16 @@ function TrilhaSOS({
 
       <View style={{ height: svgHeight }} />
 
-      {/* Botão salvar */}
+      {/* Botão concluir (progresso já é salvo automaticamente a cada etapa) */}
       {etapasConcluidas.length > 0 && (
         <TouchableOpacity
           activeOpacity={0.85}
-          style={[trilhaStyles.salvarBtn, salvando && { opacity: 0.5 }]}
+          style={trilhaStyles.salvarBtn}
           onPress={onSalvar}
-          disabled={salvando}
         >
-          <MaterialCommunityIcons name={todasConcluidas ? 'star' : 'content-save-outline'} size={20} color="#fff" />
+          <MaterialCommunityIcons name={todasConcluidas ? 'star' : 'check-circle-outline'} size={20} color="#fff" />
           <Text style={trilhaStyles.salvarText}>
-            {salvando ? 'Salvando...' : todasConcluidas ? 'Salvar Sessão' : 'Salvar Progresso'}
+            {todasConcluidas ? 'Concluir Trilha ⭐' : 'Fechar Trilha'}
           </Text>
         </TouchableOpacity>
       )}
@@ -418,6 +420,7 @@ export default function Home() {
   
   const [trilhaVisivel, setTrilhaVisivel] = useState(false);
   const [etapasConcluidas, setEtapasConcluidas] = useState<string[]>([]);
+  const [etapasAnteriores, setEtapasAnteriores] = useState<string[]>([]);
   const [fotosSessao, setFotosSessao] = useState<string[]>([]);
   const [salvando, setSalvando] = useState(false);
   const confettiHomeRef = useRef<any>(null);
@@ -433,11 +436,18 @@ export default function Home() {
     if (filhoAtivo) carregarSugestoes();
   }, [filhoAtivo?.id]);
 
-  const abrirTrilha = (alimento: AlimentoSugerido) => {
+  const abrirTrilha = async (alimento: AlimentoSugerido) => {
     setAlimentoAtivo(alimento);
     setEtapasConcluidas([]);
     setFotosSessao([]);
     setTrilhaVisivel(true);
+    if (filhoAtivo?.id && alimento.id) {
+      // Lê etapas salvas via API backend (bypassa RLS)
+      const etapas = await buscarEtapasSalvas(filhoAtivo.id, alimento.id);
+      setEtapasAnteriores(etapas);
+    } else {
+      setEtapasAnteriores([]);
+    }
   };
 
   const fecharTrilha = () => {
@@ -445,34 +455,27 @@ export default function Home() {
     setAlimentoAtivo(null);
     setEtapasConcluidas([]);
     setFotosSessao([]);
+    setEtapasAnteriores([]);
   };
 
+  // Auto-save: persiste cada etapa imediatamente ao ser concluída
   const onEtapaConcluida = (id: string, foto?: string) => {
     setEtapasConcluidas(prev => [...prev, id]);
     if (foto) setFotosSessao(prev => [...prev, foto]);
-  };
-
-  const salvarSessao = async () => {
-    setSalvando(true);
-    try {
-      const sessao = {
-        filhoId: filhoAtivo?.id,
-        alimentoId: alimentoAtivo?.id,
-        alimento: alimentoAtivo?.nome,
-        data: new Date().toISOString(),
-        etapasConcluidas,
-        totalEtapas: ETAPAS_SOS.length,
-        fotos: fotosSessao,
-      };
-      console.log('Sessão salva:', sessao);
-      // ✅ Salvar na API aqui
-      fecharTrilha();
-    } catch (error) {
-      console.error('Erro:', error);
-    } finally {
-      setSalvando(false);
+    // Salva no banco em background (fire-and-forget com log de erro)
+    if (filhoAtivo?.id && alimentoAtivo?.id) {
+      salvarEtapaSOS(filhoAtivo.id, alimentoAtivo.id, id).catch(e =>
+        console.error('Erro ao auto-salvar etapa:', e)
+      );
     }
   };
+
+  // Salvar sessão agora apenas fecha a trilha (etapas já foram auto-salvas)
+  const salvarSessao = () => {
+    fecharTrilha();
+  };
+
+  const etapasTotais = [...new Set([...etapasAnteriores, ...etapasConcluidas])];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -596,9 +599,9 @@ export default function Home() {
 
           <View style={styles.progressBarRow}>
             <View style={styles.progressBarTrack}>
-              <View style={[styles.progressBarFill, { width: `${(etapasConcluidas.length / ETAPAS_SOS.length) * 100}%` }]} />
+              <View style={[styles.progressBarFill, { width: `${(etapasTotais.length / ETAPAS_SOS.length) * 100}%` }]} />
             </View>
-            <Text style={styles.progressBarLabel}>{etapasConcluidas.length}/{ETAPAS_SOS.length}</Text>
+            <Text style={styles.progressBarLabel}>{etapasTotais.length}/{ETAPAS_SOS.length}</Text>
           </View>
 
           <Text style={styles.instrucao}>
@@ -607,7 +610,7 @@ export default function Home() {
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
             <TrilhaSOS
-              etapasConcluidas={etapasConcluidas}
+              etapasConcluidas={etapasTotais}
               onEtapaConcluida={onEtapaConcluida}
               onSalvar={salvarSessao}
               salvando={salvando}

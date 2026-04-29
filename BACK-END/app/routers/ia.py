@@ -10,9 +10,10 @@ load_dotenv()
 
 router = APIRouter(prefix="/ia", tags=["Inteligência Artificial"])
 
-# 2. Configura a URL direta usando um modelo ATUAL (gemini-2.5-flash) na rota v1beta
+# 2. Configura a URL e headers da Gemini API (chave via header, não na URL)
 CHAVE_API = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={CHAVE_API}"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+GEMINI_HEADERS = {"Content-Type": "application/json", "x-goog-api-key": CHAVE_API}
 
 # ---------------------------------------------------------------------------
 # Motor de Food Chaining (Sugestões para Home)
@@ -28,7 +29,7 @@ async def obter_sugestao(crianca_id: str):
             supabase.table("crianca_alimento")
             .select("alimentos(id, nome, textura, cor, sabor)")
             .eq("crianca_id", crianca_id)
-            .eq("status", "Aceita")
+            .eq("status", "Comer")
             .execute()
         )
         alimentos_aceitos = [h['alimentos'] for h in historico_sucesso.data if h.get('alimentos')]
@@ -139,7 +140,7 @@ async def obter_sugestao(crianca_id: str):
             }
         }
 
-        response = requests.post(GEMINI_URL, json=payload, headers={"Content-Type": "application/json"})
+        response = requests.post(GEMINI_URL, json=payload, headers=GEMINI_HEADERS)
         response.raise_for_status()
 
         dados = response.json()
@@ -202,7 +203,7 @@ async def gerar_analise_relatorio(crianca_id: str):
             }
         }
 
-        response = requests.post(GEMINI_URL, json=payload, headers={"Content-Type": "application/json"})
+        response = requests.post(GEMINI_URL, json=payload, headers=GEMINI_HEADERS)
         response.raise_for_status()
         
         dados = response.json()

@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
+import { supabase } from '../../services/supabase';
 import {
   Alert,
   Modal,
@@ -30,7 +31,8 @@ export default function Configuracoes() {
           text: 'Sair',
           style: 'destructive',
           onPress: async () => {
-            await AsyncStorage.clear();
+            try { await supabase.auth.signOut(); } catch {}
+            await AsyncStorage.multiRemove(['@juca:filhos', '@juca:filhoAtivoId', '@juca:nomeUsuario']);
             router.replace('/login');
           },
         },

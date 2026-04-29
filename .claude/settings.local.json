@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(xargs grep *)",
+      "Bash(pip install *)",
+      "Bash(python -m pytest tests/test_progresso_schema.py tests/test_cors.py -v)",
+      "Bash(git checkout *)",
+      "Bash(git push *)"
+    ]
+  }
+}

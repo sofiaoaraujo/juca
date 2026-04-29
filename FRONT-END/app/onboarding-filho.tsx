@@ -169,7 +169,7 @@ export default function OnboardingFilho() {
           await api.post('/progresso/', {
             crianca_id: criancaId,
             alimento_id: alimento.id,
-            status: 'Aceita',
+            status: 'Tolerar',
           });
         }
       }
