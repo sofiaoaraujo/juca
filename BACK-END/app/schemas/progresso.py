@@ -1,6 +1,6 @@
 # app/schemas/progresso.py
 # Modelos Pydantic para o progresso de uma criança com um alimento.
-# Reflete a tabela 'crianca_alimento' e incorpora a lógica da Trilha ABA.
+# Reflete a tabela 'crianca_alimento' e incorpora a lógica da Trilha SOS.
 
 from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
@@ -10,11 +10,17 @@ from app.schemas.alimento import AlimentoResponse
 
 
 # ---------------------------------------------------------------------------
-# Constantes da Trilha ABA (Duolingo)
+# Constantes da Trilha SOS Approach to Feeding (Dr. Kay Toomey)
 # ---------------------------------------------------------------------------
 
-# Status possíveis conforme as etapas da Terapia ABA
-STATUS_PERMITIDOS = {"Tocar", "Cheirar", "Lamber", "Comer", "Aceita", "Recusado"}
+# Etapas hierárquicas SOS Approach to Feeding (Dr. Kay Toomey)
+# Tolerar → Interagir → Cheirar → Tocar → Saborear → Comer
+# 'Recusado' é transversal: pode ocorrer em qualquer nível.
+STATUS_PERMITIDOS = {
+    "Tolerar", "Interagir", "Cheirar",
+    "Tocar", "Saborear", "Comer",
+    "Recusado",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -24,7 +30,7 @@ STATUS_PERMITIDOS = {"Tocar", "Cheirar", "Lamber", "Comer", "Aceita", "Recusado"
 class ProgressoCreate(BaseModel):
     """
     Payload para registrar ou iniciar o progresso de uma criança com um alimento.
-    O status deve seguir as etapas da Trilha ABA.
+    O status deve seguir as etapas da Trilha SOS.
     """
     crianca_id: UUID = Field(
         ..., examples=["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
@@ -34,14 +40,14 @@ class ProgressoCreate(BaseModel):
     )
     status: str = Field(
         ...,
-        examples=["Tocar"],
-        description=f"Etapa atual na Trilha ABA. Valores permitidos: {STATUS_PERMITIDOS}",
+        examples=["Tolerar"],
+        description=f"Etapa atual na Trilha SOS. Valores permitidos: {STATUS_PERMITIDOS}",
     )
 
     @field_validator("status")
     @classmethod
     def validar_status(cls, valor: str) -> str:
-        """Garante que o status informado pertence às etapas da Trilha ABA."""
+        """Garante que o status informado pertence às etapas da Trilha SOS."""
         if valor not in STATUS_PERMITIDOS:
             raise ValueError(
                 f"Status inválido: '{valor}'. "
