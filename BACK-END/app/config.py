@@ -28,6 +28,9 @@ class Settings(BaseSettings):
         "alimentar de crianças com TEA através da Trilha (ABA)."
     )
 
+    # CSV de origens autorizadas. Em dev pode ser "http://localhost:8081,exp://..."
+    cors_origins: str = "http://localhost:8081"
+
     # Instrui o pydantic-settings a ler o arquivo .env na raiz do projeto
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
