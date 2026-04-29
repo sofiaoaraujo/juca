@@ -19,6 +19,7 @@ import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../../context/FilhosContext';
 import { obterSugestoesFoodChaining, type SugestaoAlimento } from '../../services/gemini';
+import { registrarEtapasSOS } from '../../services/progresso';
 import { supabase } from '../../services/supabase';
 
 const { width, height } = Dimensions.get('window');
@@ -453,22 +454,17 @@ export default function Home() {
   };
 
   const salvarSessao = async () => {
+    if (!filhoAtivo?.id || !alimentoAtivo?.id) return;
     setSalvando(true);
     try {
-      const sessao = {
-        filhoId: filhoAtivo?.id,
-        alimentoId: alimentoAtivo?.id,
-        alimento: alimentoAtivo?.nome,
-        data: new Date().toISOString(),
-        etapasConcluidas,
-        totalEtapas: ETAPAS_SOS.length,
-        fotos: fotosSessao,
-      };
-      console.log('Sessão salva:', sessao);
-      // ✅ Salvar na API aqui
+      await registrarEtapasSOS({
+        criancaId: filhoAtivo.id,
+        alimentoId: alimentoAtivo.id,
+        etapasIds: etapasConcluidas,
+      });
       fecharTrilha();
     } catch (error) {
-      console.error('Erro:', error);
+      console.error('Erro ao salvar sessão SOS:', error);
     } finally {
       setSalvando(false);
     }
