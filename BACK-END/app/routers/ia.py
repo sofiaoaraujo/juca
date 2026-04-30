@@ -5,14 +5,12 @@ import json
 import requests
 from dotenv import load_dotenv
 
-# 1. Carrega as variáveis do arquivo .env
-load_dotenv()
+load_dotenv(override=True)
 
 router = APIRouter(prefix="/ia", tags=["Inteligência Artificial"])
 
-# 2. Configura a URL e headers da Gemini API (chave via header, não na URL)
 CHAVE_API = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 GEMINI_HEADERS = {"Content-Type": "application/json", "x-goog-api-key": CHAVE_API}
 
 # ---------------------------------------------------------------------------
@@ -51,21 +49,15 @@ async def obter_sugestao(crianca_id: str):
                     "textura": alimento.get("textura"),
                     "cor": alimento.get("cor"),
                     "sabor": alimento.get("sabor"),
-                    # Etapa exata em que a trilha SOS parou — permite remontar a trilha visual.
-                    # Valores possíveis: "Tolerar" | "Interagir" | "Cheirar" | "Tocar" | "Saborear"
                     "status": row.get("status"),
                 })
             return {"sugestoes": sugestoes_cache, "origem": "cache"}
 
-        # Nenhuma trilha ativa encontrada — prossegue gerando novas sugestões via LLM.
         print(f"[Food Chaining] Sem trilha ativa para crianca_id={crianca_id}. Chamando LLM.")
 
-        # Busca dados no Supabase
         alergias_data = supabase.table("crianca_alergia").select("alergias(nome)").eq("crianca_id", crianca_id).execute()
         alergias_lista = [item['alergias']['nome'] for item in alergias_data.data if item.get('alergias')]
 
-        # Apenas alimentos com status "Comer" servem como base para Food Chaining —
-        # são os únicos que representam aceitação real e total pela criança.
         historico_sucesso = (
             supabase.table("crianca_alimento")
             .select("alimentos(id, nome, textura, cor, sabor)")
@@ -81,8 +73,6 @@ async def obter_sugestao(crianca_id: str):
                 detail="A criança ainda não possui alimentos com status 'Comer'. Registre ao menos um alimento aceito antes de usar o Food Chaining.",
             )
 
-        # Todos os IDs já presentes na trilha (qualquer status) para não re-sugerir alimentos
-        # que a criança já está trabalhando, mesmo que ainda não tenha chegado em "Comer".
         todos_na_trilha = (
             supabase.table("crianca_alimento")
             .select("alimento_id")
@@ -91,7 +81,6 @@ async def obter_sugestao(crianca_id: str):
         )
         ids_na_trilha = [h['alimento_id'] for h in todos_na_trilha.data]
 
-        # Preenche campos sensoriais nulos com valores conhecidos para alimentos comuns
         SENSORY_DEFAULTS = {
             'maçã': {'textura': 'crocante', 'cor': 'vermelha', 'sabor': 'doce'},
             'maca': {'textura': 'crocante', 'cor': 'vermelha', 'sabor': 'doce'},
@@ -191,9 +180,7 @@ async def obter_sugestao(crianca_id: str):
 
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.4
-            }
+            "generationConfig": {"temperature": 0.4}
         }
 
         response = requests.post(GEMINI_URL, json=payload, headers=GEMINI_HEADERS)
@@ -205,7 +192,6 @@ async def obter_sugestao(crianca_id: str):
         texto_limpo = texto.strip().replace("```json", "").replace("```", "").strip()
         resultado = json.loads(texto_limpo)
 
-        # Insere no catálogo qualquer alimento novo sugerido pela IA
         for sugestao in resultado.get("sugestoes", []):
             if sugestao.get("novo") is True and not sugestao.get("id"):
                 novo_alimento = {k: v for k, v in {
@@ -219,9 +205,6 @@ async def obter_sugestao(crianca_id: str):
                 if inserido.data:
                     sugestao["id"] = inserido.data[0]["id"]
 
-        # Cria a linha inicial em crianca_alimento para cada sugestão com sugestao_ia=true.
-        # Usa ids_na_trilha (já computado) para checar duplicata sem query extra —
-        # evita o problema de maybe_single() retornar None quando não há linhas.
         inseridos_nesta_chamada: set = set()
         for sugestao in resultado.get("sugestoes", []):
             aid = sugestao.get("id")
@@ -245,6 +228,7 @@ async def obter_sugestao(crianca_id: str):
         print(f"Erro detalhado no Food Chaining: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao processar Food Chaining: {str(e)}")
 
+
 # ---------------------------------------------------------------------------
 # Analisador Clínico (Relatório para Terapeuta)
 # ---------------------------------------------------------------------------
@@ -255,36 +239,46 @@ async def gerar_analise_relatorio(crianca_id: str):
             .select("*, alimentos(nome, textura, cor, sabor)") \
             .eq("crianca_id", crianca_id) \
             .execute()
-        
+
         historico_formatado = [
-            {"alimento": i['alimentos']['nome'], "status": i['status'], "textura": i['alimentos']['textura']} 
+            {"alimento": i['alimentos']['nome'], "status": i['status'], "textura": i['alimentos']['textura']}
             for i in progresso_data.data if i.get('alimentos')
         ]
 
         prompt = f"""
-        Analise o histórico de terapia alimentar (ABA): {historico_formatado}.
-        Identifique padrões de evolução nas texturas.
+        Você é um nutricionista pediátrico especialista em terapia alimentar pelo método Food Chaining e SOS Feeding.
+
+        Analise o histórico abaixo de uma criança com hipersensibilidade sensorial em terapia alimentar:
+        {historico_formatado}
+
+        CONTEXTO:
+        - Crianças com hipersensibilidade têm todos os sentidos mais aguçados.
+        - A aceitação de novos alimentos é gradual e depende da sensação de segurança.
+        - Padrões de textura, cor e sabor são determinantes na aceitação.
+
+        Identifique:
+        1. Padrões de aceitação por textura, cor ou categoria
+        2. Pontos de estagnação ou regressão
+        3. Evolução positiva que merece ser reforçada
+        4. Recomendação prática para o próximo período terapêutico
+
         Retorne SOMENTE um JSON válido:
         {{
-            "resumo_clinico": "resumo do progresso",
-            "padroes_aceitacao": ["padrão 1", "padrão 2"],
-            "recomendacao": "próximo passo"
+            "resumo_clinico": "resumo em 2-3 frases sobre o progresso geral, mencionando padrões sensoriais observados",
+            "padroes_aceitacao": ["padrão observado 1", "padrão observado 2", "padrão observado 3"],
+            "recomendacao": "recomendação prática e específica para o próximo período, incluindo sugestão de forma de preparo ou abordagem sensorial"
         }}
         """
 
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.3
-            }
+            "generationConfig": {"temperature": 0.3}
         }
 
         response = requests.post(GEMINI_URL, json=payload, headers=GEMINI_HEADERS)
         response.raise_for_status()
-        
         dados = response.json()
         texto = dados['candidates'][0]['content']['parts'][0]['text']
-        
         texto_limpo = texto.strip().replace("```json", "").replace("```", "").strip()
         return json.loads(texto_limpo)
 

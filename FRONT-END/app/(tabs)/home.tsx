@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../../context/FilhosContext';
 import { obterSugestoesFoodChaining, type SugestaoAlimento } from '../../services/gemini';
 import { salvarEtapaSOS, buscarEtapasSalvas } from '../../services/progresso';
+import { resolverImagem } from '../../utils/alimentos';
 import { supabase } from '../../services/supabase';
 
 const { width, height } = Dimensions.get('window');
@@ -74,6 +75,7 @@ const CORES_CATEGORIA: Record<string, { fundo: string; icone: string; icon: stri
   Laticínio:   { fundo: '#E3F2FD', icone: '#BBDEFB', icon: 'cup' },
   default:     { fundo: '#F3E5F5', icone: '#E1BEE7', icon: 'food' },
 };
+
 
 // ─── Componente de loading com caju pulsando ─────────────────────────────────
 function CajuLoading() {
@@ -407,7 +409,7 @@ export default function Home() {
       const resultado = await obterSugestoesFoodChaining(filhoAtivo.id);
       
       const comCores = resultado.map(s => {
-        const cores = CORES_CATEGORIA[s.categoria] ?? CORES_CATEGORIA.default;
+        const cores = CORES_CATEGORIA[s.categoria ?? ''] ?? CORES_CATEGORIA.default;
         return { ...s, name: s.nome, icon: cores.icon, corFundo: cores.fundo, corIcone: cores.icone };
       });
       setSugestoes(comCores);
@@ -520,7 +522,7 @@ export default function Home() {
                   )}
                 </View>
                 <View style={[styles.iconeCircle, { backgroundColor: alimento.corIcone }]}>
-                  <MaterialCommunityIcons name={alimento.icon as any} size={44} color="#904c1f" />
+                  <Image source={resolverImagem(alimento.nome, alimento.categoria ?? undefined)} style={styles.cardImagem} resizeMode="contain" />
                 </View>
                 <Text style={styles.cardNome}>{alimento.nome}</Text>
                 <Text style={styles.cardMotivo}>{alimento.motivo}</Text>
@@ -594,7 +596,9 @@ export default function Home() {
           <View style={styles.trilhaHeader}>
             <View style={styles.trilhaHeaderLeft}>
               <View style={[styles.trilhaIconeCircle, { backgroundColor: alimentoAtivo?.corIcone ?? '#eee' }]}>
-                <MaterialCommunityIcons name={(alimentoAtivo?.icon ?? 'food') as any} size={24} color="#904c1f" />
+                {alimentoAtivo && (
+                  <Image source={resolverImagem(alimentoAtivo.nome, alimentoAtivo.categoria ?? undefined)} style={{ width: 32, height: 32 }} resizeMode="contain" />
+                )}
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.trilhaSuper}>TRILHA SENSORIAL · SOS</Text>
@@ -698,15 +702,16 @@ const styles = StyleSheet.create({
   loadingText: { fontSize: 14, color: '#904c1f', textAlign: 'center' },
   recarregarBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 20, marginBottom: 28, backgroundColor: '#fff5f3', borderRadius: 16, borderWidth: 1.5, borderColor: 'rgba(178,35,0,0.15)' },
   recarregarText: { fontSize: 15, fontWeight: '700', color: '#b22300' },
-  foodCard: { width: '47%', borderRadius: 28, padding: 18, alignItems: 'center', shadowColor: '#4b4944', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.06, shadowRadius: 32, elevation: 3 },
+  foodCard: { width: '47%', borderRadius: 28, padding: 18, alignItems: 'stretch', shadowColor: '#4b4944', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.06, shadowRadius: 32, elevation: 3 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 12 },
   cardCategoria: { fontSize: 10, fontWeight: '700', color: '#904c1f', letterSpacing: 1.5 },
   badgeAndamento: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(178,35,0,0.08)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 100 },
   badgeAndamentoText: { fontSize: 9, fontWeight: '700', color: '#b22300', letterSpacing: 0.5 },
-  iconeCircle: { width: (width - 112) / 2, aspectRatio: 1, borderRadius: 999, justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
+  iconeCircle: { width: 96, height: 96, borderRadius: 48, justifyContent: 'center', alignItems: 'center', marginBottom: 14, overflow: 'hidden', alignSelf: 'center' },
+  cardImagem: { width: 72, height: 72 },
   cardNome: { fontSize: 15, fontWeight: '800', color: '#1b1c16', textAlign: 'center', marginBottom: 6 },
   cardMotivo: { fontSize: 11, color: '#5e5c54', textAlign: 'center', lineHeight: 15, marginBottom: 14 },
-  cardBotao: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(178,35,0,0.08)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 100 },
+  cardBotao: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(178,35,0,0.08)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 100, alignSelf: 'center' },
   cardBotaoText: { fontSize: 12, color: '#b22300', fontWeight: '700' },
   progressCard: { backgroundColor: '#f6f4ea', borderRadius: 24, padding: 24 },
   progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
