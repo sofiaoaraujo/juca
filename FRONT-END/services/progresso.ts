@@ -1,5 +1,20 @@
 import api from './api';
 
+export type HistoricoIAItem = {
+  alimento_id: string;
+  alimento: {
+    id: string;
+    nome: string;
+    textura?: string;
+    cor?: string;
+    sabor?: string;
+  } | null;
+  etapas_concluidas: string[];
+  etapa_atual: string;
+  justificativa_ia?: string | null;
+  created_at: string;
+};
+
 // Mapeia ids da Trilha SOS visual (home.tsx) para os status canônicos
 // aceitos pelo backend (schemas/progresso.py).
 const ETAPA_TO_STATUS: Record<string, string> = {
@@ -57,6 +72,21 @@ export async function buscarEtapasSalvas(
       `/progresso/crianca/${criancaId}/alimento/${alimentoId}/etapas`,
     );
     return (data ?? []).map(s => STATUS_TO_ETAPA[s]).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Busca os alimentos sugeridos pela IA para uma criança com o progresso
+ * consolidado na trilha SOS (todas as etapas concluídas e etapa atual).
+ */
+export async function buscarHistoricoIA(criancaId: string): Promise<HistoricoIAItem[]> {
+  try {
+    const { data } = await api.get<HistoricoIAItem[]>(
+      `/progresso/crianca/${criancaId}/historico-ia`,
+    );
+    return data ?? [];
   } catch {
     return [];
   }

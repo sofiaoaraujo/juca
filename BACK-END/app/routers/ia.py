@@ -25,6 +25,8 @@ async def obter_sugestao(crianca_id: str):
         alergias_data = supabase.table("crianca_alergia").select("alergias(nome)").eq("crianca_id", crianca_id).execute()
         alergias_lista = [item['alergias']['nome'] for item in alergias_data.data if item.get('alergias')]
 
+        # Apenas alimentos com status "Comer" servem como base para Food Chaining —
+        # são os únicos que representam aceitação real e total pela criança.
         historico_sucesso = (
             supabase.table("crianca_alimento")
             .select("alimentos(id, nome, textura, cor, sabor)")
@@ -33,6 +35,22 @@ async def obter_sugestao(crianca_id: str):
             .execute()
         )
         alimentos_aceitos = [h['alimentos'] for h in historico_sucesso.data if h.get('alimentos')]
+
+        if not alimentos_aceitos:
+            raise HTTPException(
+                status_code=400,
+                detail="A criança ainda não possui alimentos com status 'Comer'. Registre ao menos um alimento aceito antes de usar o Food Chaining.",
+            )
+
+        # Todos os IDs já presentes na trilha (qualquer status) para não re-sugerir alimentos
+        # que a criança já está trabalhando, mesmo que ainda não tenha chegado em "Comer".
+        todos_na_trilha = (
+            supabase.table("crianca_alimento")
+            .select("alimento_id")
+            .eq("crianca_id", crianca_id)
+            .execute()
+        )
+        ids_na_trilha = [h['alimento_id'] for h in todos_na_trilha.data]
 
         # Preenche campos sensoriais nulos com valores conhecidos para alimentos comuns
         SENSORY_DEFAULTS = {
@@ -79,7 +97,6 @@ async def obter_sugestao(crianca_id: str):
                     alimento['sabor'] = defaults['sabor']
 
         catalogo = supabase.table("alimentos").select("id, nome, textura, cor, sabor").execute()
-        ids_aceitos = [a['id'] for a in alimentos_aceitos]
 
         prompt = f"""
         Você é um nutricionista pediátrico especialista no método Food Chaining para crianças com hipersensibilidade sensorial e dificuldades alimentares.
@@ -93,8 +110,8 @@ async def obter_sugestao(crianca_id: str):
 
         DADOS DA CRIANÇA:
         - Alergias/Restrições ABSOLUTAS: {alergias_lista}
-        - Alimentos que a criança JÁ ACEITA — ESTA É A BASE PRINCIPAL PARA SUAS SUGESTÕES: {alimentos_aceitos}
-        - IDs a NÃO sugerir (a criança já aceita esses): {ids_aceitos}
+        - Alimentos que a criança JÁ COME (status "Comer") — ESTA É A BASE PRINCIPAL PARA SUAS SUGESTÕES: {alimentos_aceitos}
+        - IDs a NÃO sugerir (já estão na trilha da criança, em qualquer etapa): {ids_na_trilha}
         - Catálogo do sistema (alimentos já cadastrados): {catalogo.data}
 
         REGRAS DE FOOD CHAINING:
@@ -149,7 +166,7 @@ async def obter_sugestao(crianca_id: str):
         texto_limpo = texto.strip().replace("```json", "").replace("```", "").strip()
         resultado = json.loads(texto_limpo)
 
-        # Insere no banco qualquer alimento novo sugerido pela IA (não estava no catálogo)
+        # Insere no catálogo qualquer alimento novo sugerido pela IA
         for sugestao in resultado.get("sugestoes", []):
             if sugestao.get("novo") is True and not sugestao.get("id"):
                 novo_alimento = {k: v for k, v in {
@@ -162,6 +179,26 @@ async def obter_sugestao(crianca_id: str):
                 inserido = supabase.table("alimentos").insert(novo_alimento).execute()
                 if inserido.data:
                     sugestao["id"] = inserido.data[0]["id"]
+
+        # Cria a linha inicial em crianca_alimento para cada sugestão com sugestao_ia=true.
+        # Usa ids_na_trilha (já computado) para checar duplicata sem query extra —
+        # evita o problema de maybe_single() retornar None quando não há linhas.
+        inseridos_nesta_chamada: set = set()
+        for sugestao in resultado.get("sugestoes", []):
+            aid = sugestao.get("id")
+            if not aid:
+                continue
+            if aid in ids_na_trilha or aid in inseridos_nesta_chamada:
+                continue
+
+            supabase.table("crianca_alimento").insert({
+                "crianca_id": crianca_id,
+                "alimento_id": aid,
+                "status": "Tolerar",
+                "sugestao_ia": True,
+                "justificativa_ia": sugestao.get("motivo"),
+            }).execute()
+            inseridos_nesta_chamada.add(aid)
 
         return resultado
 
