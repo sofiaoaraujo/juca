@@ -6,9 +6,13 @@ export type SugestaoAlimento = {
   id: string;
   nome: string;
   motivo: string;
-  categoria: string;
-  textura: string;
-  cor: string;
+  categoria: string | null;
+  textura: string | null;
+  cor: string | null;
+  forma_preparo: string | null;
+  // Presente apenas quando a API retorna do cache (trilha SOS em andamento).
+  // Valores: "Tolerar" | "Interagir" | "Cheirar" | "Tocar" | "Saborear"
+  status: string | null;
 };
 
 export type AnaliseRelatorio = {

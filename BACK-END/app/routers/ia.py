@@ -12,7 +12,7 @@ router = APIRouter(prefix="/ia", tags=["Inteligência Artificial"])
 
 # 2. Configura a URL e headers da Gemini API (chave via header, não na URL)
 CHAVE_API = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent"
 GEMINI_HEADERS = {"Content-Type": "application/json", "x-goog-api-key": CHAVE_API}
 
 # ---------------------------------------------------------------------------
@@ -21,6 +21,45 @@ GEMINI_HEADERS = {"Content-Type": "application/json", "x-goog-api-key": CHAVE_AP
 @router.post("/sugestao-food-chaining/{crianca_id}")
 async def obter_sugestao(crianca_id: str):
     try:
+        # ---------------------------------------------------------------------------
+        # TRAVA DE GERAÇÃO: verifica trilha SOS ativa antes de chamar o LLM.
+        # "Ativa" = sugestao_ia=true E status ainda não chegou em "Comer".
+        # Se existir ao menos uma linha nesse estado, a trilha não terminou —
+        # devolvemos o cache sem gastar quota da API.
+        # ---------------------------------------------------------------------------
+        sugestoes_em_andamento = (
+            supabase.table("crianca_alimento")
+            .select("status, justificativa_ia, alimentos(id, nome, textura, cor, sabor)")
+            .eq("crianca_id", crianca_id)
+            .eq("sugestao_ia", True)
+            .neq("status", "Comer")
+            .execute()
+        )
+
+        if sugestoes_em_andamento.data:
+            print(f"[Food Chaining] Trilha SOS ativa encontrada para crianca_id={crianca_id}. Retornando cache sem chamar LLM.")
+            sugestoes_cache = []
+            for row in sugestoes_em_andamento.data:
+                alimento = row.get("alimentos") or {}
+                sugestoes_cache.append({
+                    "id": alimento.get("id"),
+                    "novo": False,
+                    "nome": alimento.get("nome"),
+                    "motivo": row.get("justificativa_ia"),
+                    "forma_preparo": None,
+                    "categoria": None,
+                    "textura": alimento.get("textura"),
+                    "cor": alimento.get("cor"),
+                    "sabor": alimento.get("sabor"),
+                    # Etapa exata em que a trilha SOS parou — permite remontar a trilha visual.
+                    # Valores possíveis: "Tolerar" | "Interagir" | "Cheirar" | "Tocar" | "Saborear"
+                    "status": row.get("status"),
+                })
+            return {"sugestoes": sugestoes_cache, "origem": "cache"}
+
+        # Nenhuma trilha ativa encontrada — prossegue gerando novas sugestões via LLM.
+        print(f"[Food Chaining] Sem trilha ativa para crianca_id={crianca_id}. Chamando LLM.")
+
         # Busca dados no Supabase
         alergias_data = supabase.table("crianca_alergia").select("alergias(nome)").eq("crianca_id", crianca_id).execute()
         alergias_lista = [item['alergias']['nome'] for item in alergias_data.data if item.get('alergias')]
