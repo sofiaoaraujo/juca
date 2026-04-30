@@ -43,6 +43,14 @@ class ProgressoCreate(BaseModel):
         examples=["Tolerar"],
         description=f"Etapa atual na Trilha SOS. Valores permitidos: {STATUS_PERMITIDOS}",
     )
+    sugestao_ia: Optional[bool] = Field(
+        default=None,
+        description="Indica se este alimento foi sugerido pelo motor de Food Chaining da IA.",
+    )
+    justificativa_ia: Optional[str] = Field(
+        default=None,
+        description="Motivo da sugestão gerado pela IA (Food Chaining).",
+    )
 
     @field_validator("status")
     @classmethod

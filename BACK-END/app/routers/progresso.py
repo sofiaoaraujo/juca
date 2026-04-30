@@ -178,6 +178,95 @@ async def atualizar_progresso(progresso_id: UUID, payload: ProgressoUpdate):
 
 
 # ---------------------------------------------------------------------------
+# GET /progresso/crianca/{crianca_id}/historico-ia
+# Histórico de alimentos sugeridos pela IA com etapas SOS consolidadas
+# ---------------------------------------------------------------------------
+@router.get(
+    "/crianca/{crianca_id}/historico-ia",
+    summary="Listar alimentos sugeridos pela IA com suas etapas SOS",
+)
+async def historico_sugestoes_ia(crianca_id: UUID):
+    """
+    Retorna todos os alimentos que a IA sugeriu para a criança, com as etapas
+    SOS que ela já concluiu em cada um e a etapa atual (última concluída).
+
+    Lógica de dois passos:
+    1. Descobre quais alimento_ids têm pelo menos uma linha com sugestao_ia=true.
+    2. Busca TODAS as linhas desses alimentos (incluindo etapas posteriores sem
+       sugestao_ia=true), agrupa por alimento e reconstrói o progresso completo.
+    """
+    ORDEM_ETAPAS = ["Tolerar", "Interagir", "Cheirar", "Tocar", "Saborear", "Comer"]
+
+    try:
+        # Passo 1: alimento_ids que vieram de sugestão da IA
+        sugestoes_resp = (
+            supabase.table("crianca_alimento")
+            .select("alimento_id, justificativa_ia")
+            .eq("crianca_id", str(crianca_id))
+            .eq("sugestao_ia", True)
+            .execute()
+        )
+        if not sugestoes_resp.data:
+            return []
+
+        # Mapeia alimento_id → justificativa (primeiro registro por alimento)
+        mapa_justificativa: dict = {}
+        for s in sugestoes_resp.data:
+            aid = s["alimento_id"]
+            if aid not in mapa_justificativa:
+                mapa_justificativa[aid] = s.get("justificativa_ia")
+        ids_sugeridos = list(mapa_justificativa.keys())
+
+        # Passo 2: todas as linhas de progresso para esses alimentos
+        # (abrange etapas posteriores que não carregam sugestao_ia=true)
+        todos_resp = (
+            supabase.table("crianca_alimento")
+            .select("alimento_id, status, created_at, alimentos(id, nome, textura, cor, sabor)")
+            .eq("crianca_id", str(crianca_id))
+            .in_("alimento_id", ids_sugeridos)
+            .order("created_at", desc=False)
+            .execute()
+        )
+
+        # Agrupa por alimento coletando todas as etapas distintas
+        grupos: dict = {}
+        for item in todos_resp.data:
+            aid = item["alimento_id"]
+            if aid not in grupos:
+                grupos[aid] = {
+                    "alimento": item.get("alimentos"),
+                    "stages": set(),
+                    "created_at": item["created_at"],
+                }
+            grupos[aid]["stages"].add(item["status"])
+
+        # Monta resposta com etapas ordenadas e etapa atual
+        resultado = []
+        for aid, data in grupos.items():
+            etapas_ordenadas = [e for e in ORDEM_ETAPAS if e in data["stages"]]
+            if "Recusado" in data["stages"]:
+                etapas_ordenadas.append("Recusado")
+            etapa_atual = etapas_ordenadas[-1] if etapas_ordenadas else "Tolerar"
+            resultado.append({
+                "alimento_id": aid,
+                "alimento": data["alimento"],
+                "etapas_concluidas": etapas_ordenadas,
+                "etapa_atual": etapa_atual,
+                "justificativa_ia": mapa_justificativa.get(aid),
+                "created_at": data["created_at"],
+            })
+
+        resultado.sort(key=lambda x: x["created_at"])
+        return resultado
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao buscar histórico de sugestões IA: {str(e)}",
+        )
+
+
+# ---------------------------------------------------------------------------
 # GET /progresso/crianca/{crianca_id}/alimento/{alimento_id}
 # Buscar progresso específico de uma criança com um alimento
 # ---------------------------------------------------------------------------
