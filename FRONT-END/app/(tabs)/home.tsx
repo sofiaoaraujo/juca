@@ -440,14 +440,15 @@ export default function Home() {
     setAlimentoAtivo(alimento);
     setEtapasConcluidas([]);
     setFotosSessao([]);
-    setTrilhaVisivel(true);
+
+    // Busca etapas antes de abrir o modal para evitar flash de trilha vazia.
+    // Só então abre o modal com o progresso já restaurado.
+    let etapasRestauradas: string[] = [];
     if (filhoAtivo?.id && alimento.id) {
-      // Lê etapas salvas via API backend (bypassa RLS)
-      const etapas = await buscarEtapasSalvas(filhoAtivo.id, alimento.id);
-      setEtapasAnteriores(etapas);
-    } else {
-      setEtapasAnteriores([]);
+      etapasRestauradas = await buscarEtapasSalvas(filhoAtivo.id, alimento.id);
     }
+    setEtapasAnteriores(etapasRestauradas);
+    setTrilhaVisivel(true);
   };
 
   const fecharTrilha = () => {
@@ -509,14 +510,22 @@ export default function Home() {
           <View style={styles.cardsRow}>
             {sugestoes.map((alimento) => (
               <TouchableOpacity key={alimento.id} activeOpacity={0.75} style={[styles.foodCard, { backgroundColor: alimento.corFundo }]} onPress={() => abrirTrilha(alimento)}>
-                <Text style={styles.cardCategoria}>{alimento.categoria.toUpperCase()}</Text>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardCategoria}>{(alimento.categoria ?? 'Alimento').toUpperCase()}</Text>
+                  {alimento.status && (
+                    <View style={styles.badgeAndamento}>
+                      <MaterialCommunityIcons name="clock-outline" size={10} color="#b22300" />
+                      <Text style={styles.badgeAndamentoText}>Em andamento</Text>
+                    </View>
+                  )}
+                </View>
                 <View style={[styles.iconeCircle, { backgroundColor: alimento.corIcone }]}>
                   <MaterialCommunityIcons name={alimento.icon as any} size={44} color="#904c1f" />
                 </View>
                 <Text style={styles.cardNome}>{alimento.nome}</Text>
                 <Text style={styles.cardMotivo}>{alimento.motivo}</Text>
                 <View style={styles.cardBotao}>
-                  <Text style={styles.cardBotaoText}>Iniciar Trilha</Text>
+                  <Text style={styles.cardBotaoText}>{alimento.status ? 'Retomar Trilha' : 'Iniciar Trilha'}</Text>
                   <MaterialCommunityIcons name="arrow-right" size={13} color="#b22300" />
                 </View>
               </TouchableOpacity>
@@ -605,7 +614,9 @@ export default function Home() {
           </View>
 
           <Text style={styles.instrucao}>
-            🌱 Toque na etapa destacada para ver as dicas. Cada etapa só é desbloqueada após a anterior!
+            {etapasTotais.length > 0
+              ? '🔄 Trilha retomada! Toque na etapa destacada para continuar de onde parou.'
+              : '🌱 Toque na etapa destacada para ver as dicas. Cada etapa só é desbloqueada após a anterior!'}
           </Text>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
@@ -688,7 +699,10 @@ const styles = StyleSheet.create({
   recarregarBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 20, marginBottom: 28, backgroundColor: '#fff5f3', borderRadius: 16, borderWidth: 1.5, borderColor: 'rgba(178,35,0,0.15)' },
   recarregarText: { fontSize: 15, fontWeight: '700', color: '#b22300' },
   foodCard: { width: '47%', borderRadius: 28, padding: 18, alignItems: 'center', shadowColor: '#4b4944', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.06, shadowRadius: 32, elevation: 3 },
-  cardCategoria: { fontSize: 10, fontWeight: '700', color: '#904c1f', letterSpacing: 1.5, marginBottom: 12, alignSelf: 'flex-start' },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 12 },
+  cardCategoria: { fontSize: 10, fontWeight: '700', color: '#904c1f', letterSpacing: 1.5 },
+  badgeAndamento: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(178,35,0,0.08)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 100 },
+  badgeAndamentoText: { fontSize: 9, fontWeight: '700', color: '#b22300', letterSpacing: 0.5 },
   iconeCircle: { width: (width - 112) / 2, aspectRatio: 1, borderRadius: 999, justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
   cardNome: { fontSize: 15, fontWeight: '800', color: '#1b1c16', textAlign: 'center', marginBottom: 6 },
   cardMotivo: { fontSize: 11, color: '#5e5c54', textAlign: 'center', lineHeight: 15, marginBottom: 14 },
