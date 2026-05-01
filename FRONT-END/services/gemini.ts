@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// A URL busca o IP do seu computador definido no arquivo .env
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? 'http://192.168.1.8:8000';
 const CACHE_HORAS = 6;
 
@@ -70,12 +69,10 @@ export async function obterSugestoesFoodChaining(criancaId: string): Promise<Sug
   }
 }
 
-/**
- * Gera uma análise clínica detalhada para o relatório da criança.
- */
-export async function gerarAnaliseRelatorio(criancaId: string): Promise<AnaliseRelatorio> {
+export async function gerarAnaliseRelatorio(criancaId: string, force = false): Promise<AnaliseRelatorio> {
   try {
-    const response = await fetch(`${BACKEND_URL}/ia/analise-relatorio/${criancaId}`, {
+    const url = `${BACKEND_URL}/ia/analise-relatorio/${criancaId}${force ? '?force=true' : ''}`;
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });

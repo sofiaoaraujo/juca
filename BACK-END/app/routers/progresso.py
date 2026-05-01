@@ -68,6 +68,19 @@ async def registrar_progresso(payload: ProgressoCreate):
                 detail=f"Alimento com ID '{payload.alimento_id}' não encontrado.",
             )
 
+        # Idempotência: se essa etapa já foi registrada, retorna a row existente
+        existente = (
+            supabase.table("crianca_alimento")
+            .select("*")
+            .eq("crianca_id", str(payload.crianca_id))
+            .eq("alimento_id", str(payload.alimento_id))
+            .eq("status", payload.status)
+            .limit(1)
+            .execute()
+        )
+        if existente.data:
+            return existente.data[0]
+
         dados = payload.model_dump(mode="json")
         resposta = supabase.table("crianca_alimento").insert(dados).execute()
 
@@ -198,7 +211,19 @@ async def historico_sugestoes_ia(crianca_id: UUID):
     ORDEM_ETAPAS = ["Tolerar", "Interagir", "Cheirar", "Tocar", "Saborear", "Comer"]
 
     try:
-        # Passo 1: alimento_ids que vieram de sugestão da IA
+        # Passo 1: todos os alimento_ids distintos com qualquer progresso para esta criança
+        todos_ids_resp = (
+            supabase.table("crianca_alimento")
+            .select("alimento_id")
+            .eq("crianca_id", str(crianca_id))
+            .execute()
+        )
+        if not todos_ids_resp.data:
+            return []
+
+        ids_distintos = list({item["alimento_id"] for item in todos_ids_resp.data})
+
+        # Passo 1b: justificativas da IA (apenas onde sugestao_ia=true)
         sugestoes_resp = (
             supabase.table("crianca_alimento")
             .select("alimento_id, justificativa_ia")
@@ -206,24 +231,18 @@ async def historico_sugestoes_ia(crianca_id: UUID):
             .eq("sugestao_ia", True)
             .execute()
         )
-        if not sugestoes_resp.data:
-            return []
-
-        # Mapeia alimento_id → justificativa (primeiro registro por alimento)
         mapa_justificativa: dict = {}
-        for s in sugestoes_resp.data:
+        for s in (sugestoes_resp.data or []):
             aid = s["alimento_id"]
             if aid not in mapa_justificativa:
                 mapa_justificativa[aid] = s.get("justificativa_ia")
-        ids_sugeridos = list(mapa_justificativa.keys())
 
         # Passo 2: todas as linhas de progresso para esses alimentos
-        # (abrange etapas posteriores que não carregam sugestao_ia=true)
         todos_resp = (
             supabase.table("crianca_alimento")
             .select("alimento_id, status, created_at, alimentos(id, nome, textura, cor, sabor)")
             .eq("crianca_id", str(crianca_id))
-            .in_("alimento_id", ids_sugeridos)
+            .in_("alimento_id", ids_distintos)
             .order("created_at", desc=False)
             .execute()
         )

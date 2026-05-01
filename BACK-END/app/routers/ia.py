@@ -233,8 +233,21 @@ async def obter_sugestao(crianca_id: str):
 # Analisador Clínico (Relatório para Terapeuta)
 # ---------------------------------------------------------------------------
 @router.post("/analise-relatorio/{crianca_id}")
-async def gerar_analise_relatorio(crianca_id: str):
+async def gerar_analise_relatorio(crianca_id: str, force: bool = False):
     try:
+        # Retorna do banco se já existe e não foi pedida regeneração
+        if not force:
+            crianca_resp = (
+                supabase.table("criancas")
+                .select("relatorio_ia")
+                .eq("id", crianca_id)
+                .maybe_single()
+                .execute()
+            )
+            relatorio_salvo = crianca_resp.data.get("relatorio_ia") if crianca_resp.data else None
+            if relatorio_salvo:
+                return json.loads(relatorio_salvo)
+
         progresso_data = supabase.table("crianca_alimento") \
             .select("*, alimentos(nome, textura, cor, sabor)") \
             .eq("crianca_id", crianca_id) \
@@ -280,7 +293,14 @@ async def gerar_analise_relatorio(crianca_id: str):
         dados = response.json()
         texto = dados['candidates'][0]['content']['parts'][0]['text']
         texto_limpo = texto.strip().replace("```json", "").replace("```", "").strip()
-        return json.loads(texto_limpo)
+        resultado = json.loads(texto_limpo)
+
+        # Salva no banco para evitar regeneração desnecessária
+        supabase.table("criancas").update(
+            {"relatorio_ia": json.dumps(resultado, ensure_ascii=False)}
+        ).eq("id", crianca_id).execute()
+
+        return resultado
 
     except Exception as e:
         print(f"Erro detalhado no Relatório: {str(e)}")
