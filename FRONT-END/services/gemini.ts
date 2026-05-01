@@ -1,6 +1,6 @@
 // services/gemini.ts
 // Substitua pelo IP que você encontrou no Passo 1!
-const BACKEND_URL = 'http://192.168.1.12:8000'; 
+const BACKEND_URL = 'http://192.168.0.3:8000'; 
 
 export type SugestaoAlimento = {
   id: string;
@@ -40,8 +40,9 @@ export async function obterSugestoesFoodChaining(criancaId: string): Promise<Sug
 }
 
 // ─── Análise Clínica para Relatório (Via Back-end) ──────────────────────────
-export async function gerarAnaliseRelatorio(criancaId: string): Promise<AnaliseRelatorio> {
-  const response = await fetch(`${BACKEND_URL}/ia/analise-relatorio/${criancaId}`, {
+export async function gerarAnaliseRelatorio(criancaId: string, force = false): Promise<AnaliseRelatorio> {
+  const url = `${BACKEND_URL}/ia/analise-relatorio/${criancaId}${force ? '?force=true' : ''}`;
+  const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   });

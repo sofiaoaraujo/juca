@@ -1,8 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../../context/FilhosContext';
 import { gerarAnaliseRelatorio, type AnaliseRelatorio } from '../../services/gemini';
+import { supabase } from '../../services/supabase';
 import { buscarHistoricoIA, type HistoricoIAItem } from '../../services/progresso';
 
 // ─── Etapas SOS: status canônicos do backend → rótulos visuais ───────────────
@@ -114,11 +115,11 @@ export default function Relatorio() {
   const [analise, setAnalise] = useState<AnaliseRelatorio | null>(null);
   const [carregandoAnalise, setCarregandoAnalise] = useState(false);
 
-  const carregarAnalise = async () => {
+  const carregarAnalise = async (force = false) => {
     if (!filhoAtivo?.id) return;
     setCarregandoAnalise(true);
     try {
-      const resultado = await gerarAnaliseRelatorio(filhoAtivo.id);
+      const resultado = await gerarAnaliseRelatorio(filhoAtivo.id, force);
       setAnalise(resultado);
     } catch (error) {
       console.error('Erro ao gerar análise:', error);
@@ -128,19 +129,26 @@ export default function Relatorio() {
   };
 
   useEffect(() => {
-    AsyncStorage.getItem('@juca:nomeUsuario').then(v => {
-      if (v) setNomeUsuario(v);
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      const nome = user?.user_metadata?.nome ?? '';
+      if (nome) setNomeUsuario(nome);
     });
   }, []);
 
   useEffect(() => {
     if (!filhoAtivo?.id) return;
     carregarAnalise();
-    setCarregandoHistorico(true);
-    buscarHistoricoIA(filhoAtivo.id)
-      .then(setHistoricoIA)
-      .finally(() => setCarregandoHistorico(false));
   }, [filhoAtivo?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!filhoAtivo?.id) return;
+      setCarregandoHistorico(true);
+      buscarHistoricoIA(filhoAtivo.id)
+        .then(setHistoricoIA)
+        .finally(() => setCarregandoHistorico(false));
+    }, [filhoAtivo?.id]),
+  );
 
   const nomeFilho  = filhoAtivo?.nome ?? '';
   const sexoFilho  = filhoAtivo?.sexo ?? '';
@@ -375,7 +383,17 @@ export default function Relatorio() {
             </View>
           ) : analise ? (
             <>
-              <Text style={styles.detalheLabel}>ANÁLISE CLÍNICA</Text>
+              <View style={styles.detalheLabelRow}>
+                <Text style={[styles.detalheLabel, { marginBottom: 0, marginTop: 0 }]}>ANÁLISE CLÍNICA</Text>
+                <TouchableOpacity
+                  onPress={() => carregarAnalise(true)}
+                  disabled={carregandoAnalise}
+                  activeOpacity={0.7}
+                  style={styles.refreshBtn}
+                >
+                  <MaterialCommunityIcons name="refresh" size={16} color="#904c1f" />
+                </TouchableOpacity>
+              </View>
               <View style={styles.analiseBox}>
                 <Text style={styles.analiseResumo}>{analise.resumo_clinico}</Text>
               </View>
@@ -688,6 +706,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginTop: 4,
   },
+  detalheLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  refreshBtn: { padding: 4 },
 
   sessaoCard: { backgroundColor: '#f6f4ea', borderRadius: 14, padding: 14, marginBottom: 8 },
   sessaoHeader: {
