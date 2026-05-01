@@ -10,7 +10,7 @@ load_dotenv(override=True)
 router = APIRouter(prefix="/ia", tags=["Inteligência Artificial"])
 
 CHAVE_API = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent"
 GEMINI_HEADERS = {"Content-Type": "application/json", "x-goog-api-key": CHAVE_API}
 
 # ---------------------------------------------------------------------------
