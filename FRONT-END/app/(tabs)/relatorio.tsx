@@ -422,7 +422,7 @@ export default function Relatorio() {
             <TouchableOpacity
               activeOpacity={0.8}
               style={styles.recarregarBox}
-              onPress={carregarAnalise}
+              onPress={() => carregarAnalise()}
             >
               <MaterialCommunityIcons name="refresh" size={18} color="#b22300" />
               <Text style={styles.recarregarText}>Gerar análise clínica</Text>
