@@ -540,18 +540,6 @@ export default function Home() {
           </TouchableOpacity>
         )}
 
-        {/* Progresso */}
-        <View style={styles.progressCard}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressTitulo}>Progresso da Semana</Text>
-            <Text style={styles.progressContador}>3 / 5</Text>
-          </View>
-          <Text style={styles.progressSub}>sessões realizadas esta semana</Text>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: '60%' }]} />
-          </View>
-          <Text style={styles.progressMeta}>Meta: 5 sessões semanais</Text>
-        </View>
       </ScrollView>
 
       {/* Modal Seletor */}
@@ -619,8 +607,8 @@ export default function Home() {
 
           <Text style={styles.instrucao}>
             {etapasTotais.length > 0
-              ? '🔄 Trilha retomada! Toque na etapa destacada para continuar de onde parou.'
-              : '🌱 Toque na etapa destacada para ver as dicas. Cada etapa só é desbloqueada após a anterior!'}
+              ? 'Trilha retomada! Toque na etapa destacada para continuar de onde parou.'
+              : 'Toque na etapa destacada para ver as dicas. Cada etapa só é desbloqueada após a anterior!'}
           </Text>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
@@ -713,14 +701,6 @@ const styles = StyleSheet.create({
   cardMotivo: { fontSize: 11, color: '#5e5c54', textAlign: 'center', lineHeight: 15, marginBottom: 14 },
   cardBotao: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(178,35,0,0.08)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 100, alignSelf: 'center' },
   cardBotaoText: { fontSize: 12, color: '#b22300', fontWeight: '700' },
-  progressCard: { backgroundColor: '#f6f4ea', borderRadius: 24, padding: 24 },
-  progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  progressTitulo: { fontSize: 16, fontWeight: '800', color: '#1b1c16' },
-  progressContador: { fontSize: 20, fontWeight: '800', color: '#b22300' },
-  progressSub: { fontSize: 13, color: '#5e5c54', marginBottom: 16 },
-  progressTrack: { height: 12, backgroundColor: '#e4e3d9', borderRadius: 12, overflow: 'hidden', marginBottom: 10 },
-  progressFill: { height: '100%', borderRadius: 12, backgroundColor: '#b22300' },
-  progressMeta: { fontSize: 12, color: '#904c1f', fontWeight: '600' },
   overlay: { flex: 1, backgroundColor: 'rgba(27,28,22,0.4)', justifyContent: 'flex-start', alignItems: 'flex-end', paddingTop: 100, paddingRight: 24 },
   seletorModal: { backgroundColor: '#fff', borderRadius: 24, padding: 20, width: 240, shadowColor: '#4b4944', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.12, shadowRadius: 32, elevation: 10 },
   seletorTitulo: { fontSize: 10, fontWeight: '700', color: '#904c1f', letterSpacing: 1.5, marginBottom: 14 },
