@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import {
   Alert,
   Dimensions,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { resolverImagem } from '../utils/alimentos';
 import MaskInput from 'react-native-mask-input';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../context/FilhosContext';
@@ -346,7 +348,7 @@ export default function OnboardingFilho() {
             onPress={() => toggleAlimento(item.name)}
           >
             <View style={[styles.iconCircle, { backgroundColor: item.color }]}>
-              <MaterialCommunityIcons name={item.icon as any} size={30} color="#904c1f" />
+              <Image source={resolverImagem(item.name)} style={styles.foodImagem} resizeMode="contain" />
             </View>
             <Text style={[
               styles.foodLabel,
@@ -356,7 +358,7 @@ export default function OnboardingFilho() {
             </Text>
           </TouchableOpacity>
         ))}
-        <View style={{ height: 100 }} />
+        <View style={{ height: 220 }} />
       </ScrollView>
       <View style={styles.footer}>
         <TouchableOpacity
@@ -398,10 +400,11 @@ const styles = StyleSheet.create({
   optText: { fontSize: 18, fontWeight: '700', color: '#1b1c16' },
   optTextActive: { color: '#fff' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingBottom: 20 },
-  foodCard: { width: (width - 80) / 2, backgroundColor: '#fff', padding: 20, borderRadius: 30, alignItems: 'center', marginBottom: 15, borderWidth: 2, borderColor: 'transparent', elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 2 },
+  foodCard: { width: (width - 80) / 2, backgroundColor: '#fff', padding: 20, borderRadius: 30, alignItems: 'stretch', marginBottom: 15, borderWidth: 2, borderColor: 'transparent', elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 2 },
   foodCardActive: { borderWidth: 2, borderColor: '#b22300', backgroundColor: '#fff5f3' },
-  iconCircle: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-  foodLabel: { fontWeight: '600', color: '#1b1c16', fontSize: 14, textAlign: 'center' },
+  iconCircle: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 10, overflow: 'hidden', alignSelf: 'center' },
+  foodImagem: { width: 44, height: 44 },
+  foodLabel: { fontWeight: '600', color: '#1b1c16', fontSize: 12, textAlign: 'center' },
   foodLabelActive: { color: '#b22300' },
   footer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 30, backgroundColor: '#fcf9ef' },
   finishBtn: { backgroundColor: '#b22300', padding: 22, borderRadius: 100, alignItems: 'center' },
