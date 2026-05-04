@@ -27,7 +27,7 @@ async def obter_sugestao(crianca_id: str):
         # ---------------------------------------------------------------------------
         sugestoes_em_andamento = (
             supabase.table("crianca_alimento")
-            .select("status, justificativa_ia, alimentos(id, nome, textura, cor, sabor)")
+            .select("status, justificativa_ia, alimentos(id, nome, textura, cor, sabor, categoria)")
             .eq("crianca_id", crianca_id)
             .eq("sugestao_ia", True)
             .neq("status", "Comer")
@@ -45,7 +45,7 @@ async def obter_sugestao(crianca_id: str):
                     "nome": alimento.get("nome"),
                     "motivo": row.get("justificativa_ia"),
                     "forma_preparo": None,
-                    "categoria": None,
+                    "categoria": alimento.get("categoria"),
                     "textura": alimento.get("textura"),
                     "cor": alimento.get("cor"),
                     "sabor": alimento.get("sabor"),
@@ -124,7 +124,8 @@ async def obter_sugestao(crianca_id: str):
                 if not alimento.get('sabor') and defaults.get('sabor'):
                     alimento['sabor'] = defaults['sabor']
 
-        catalogo = supabase.table("alimentos").select("id, nome, textura, cor, sabor").execute()
+        catalogo = supabase.table("alimentos").select("id, nome, textura, cor, sabor, categoria").execute()
+        catalogo_por_id = {a["id"]: a.get("categoria") for a in catalogo.data if a.get("id")}
 
         prompt = f"""
         Você é um nutricionista pediátrico especialista no método Food Chaining para crianças com hipersensibilidade sensorial e dificuldades alimentares.
@@ -193,12 +194,18 @@ async def obter_sugestao(crianca_id: str):
         resultado = json.loads(texto_limpo)
 
         for sugestao in resultado.get("sugestoes", []):
+            aid = sugestao.get("id")
+            if aid and catalogo_por_id.get(aid):
+                sugestao["categoria"] = catalogo_por_id[aid]
+
+        for sugestao in resultado.get("sugestoes", []):
             if sugestao.get("novo") is True and not sugestao.get("id"):
                 novo_alimento = {k: v for k, v in {
                     "nome": sugestao.get("nome"),
                     "textura": sugestao.get("textura"),
                     "cor": sugestao.get("cor"),
                     "sabor": sugestao.get("sabor"),
+                    "categoria": sugestao.get("categoria"),
                 }.items() if v is not None}
 
                 inserido = supabase.table("alimentos").insert(novo_alimento).execute()
@@ -216,7 +223,7 @@ async def obter_sugestao(crianca_id: str):
             supabase.table("crianca_alimento").insert({
                 "crianca_id": crianca_id,
                 "alimento_id": aid,
-                "status": "Tolerar",
+                "status": "Pendente",
                 "sugestao_ia": True,
                 "justificativa_ia": sugestao.get("motivo"),
             }).execute()

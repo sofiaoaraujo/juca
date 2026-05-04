@@ -73,8 +73,10 @@ export function FilhosProvider({ children }: { children: React.ReactNode }) {
 
   const recarregar = useCallback(async () => {
     try {
-      const v = await AsyncStorage.getItem(STORAGE_KEY);
-      let lista: Filho[] = v ? JSON.parse(v) : [];
+      // TESTE: cache desabilitado temporariamente
+      // const v = await AsyncStorage.getItem(STORAGE_KEY);
+      // let lista: Filho[] = v ? JSON.parse(v) : [];
+      let lista: Filho[] = [];
 
       // Fallback: se o cache local está vazio mas há sessão autenticada,
       // busca os filhos diretamente do Supabase e persiste localmente.

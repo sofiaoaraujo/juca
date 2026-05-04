@@ -513,7 +513,7 @@ export default function Home() {
             {sugestoes.map((alimento) => (
               <TouchableOpacity key={alimento.id} activeOpacity={0.75} style={[styles.foodCard, { backgroundColor: alimento.corFundo }]} onPress={() => abrirTrilha(alimento)}>
                 <View style={styles.cardHeader}>
-                  <Text style={styles.cardCategoria}>{(alimento.categoria ?? 'Alimento').toUpperCase()}</Text>
+                  <Text style={styles.cardCategoria} numberOfLines={1}>{(alimento.categoria ?? 'Alimento').toUpperCase()}</Text>
                   {alimento.status && (
                     <View style={styles.badgeAndamento}>
                       <MaterialCommunityIcons name="clock-outline" size={10} color="#b22300" />
