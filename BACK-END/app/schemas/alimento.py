@@ -25,6 +25,9 @@ class AlimentoCreate(BaseModel):
     sabor: Optional[str] = Field(
         default=None, examples=["Doce"], description="Ex: Doce, Salgado, Amargo, Azedo"
     )
+    categoria: Optional[str] = Field(
+        default=None, examples=["Fruta"], description="Categoria do alimento (ex: Fruta, Legume, Proteína)"
+    )
 
 
 class AlimentoUpdate(BaseModel):
@@ -35,7 +38,7 @@ class AlimentoUpdate(BaseModel):
     textura: Optional[str] = None
     cor: Optional[str] = None
     sabor: Optional[str] = None
-
+    categoria: Optional[str] = None
 
 # ---------------------------------------------------------------------------
 # Schemas de RESPONSE
@@ -51,5 +54,6 @@ class AlimentoResponse(BaseModel):
     textura: Optional[str] = None
     cor: Optional[str] = None
     sabor: Optional[str] = None
-
+    categoria: Optional[str] = None
+    
     model_config = {"from_attributes": True}
