@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? 'http://192.168.1.43:8000';
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? 'http://ipv4:8000';
 const CACHE_HORAS = 6;
 
 export type SugestaoAlimento = {
@@ -22,22 +22,25 @@ export type AnaliseRelatorio = {
 
 /**
  * Busca sugestões de alimentos baseadas no método Food Chaining.
- * Usa cache de 6h para evitar chamadas desnecessárias ao back-end.
+ * Usa cache de 6h por padrão. Passe forceRefresh=true para ignorar o cache
+ * (usado pelo botão "Sugerir Novos Alimentos" após recusa ou conclusão).
  */
-export async function obterSugestoesFoodChaining(criancaId: string): Promise<SugestaoAlimento[]> {
-  // Verifica cache
+export async function obterSugestoesFoodChaining(criancaId: string, forceRefresh = false): Promise<SugestaoAlimento[]> {
   const cacheKey = `@juca:sugestoes:${criancaId}`;
-  try {
-    const cached = await AsyncStorage.getItem(cacheKey);
-    if (cached) {
-      const { data, timestamp } = JSON.parse(cached);
-      const horas = (Date.now() - timestamp) / 1000 / 3600;
-      if (horas < CACHE_HORAS) {
-        console.log('Sugestões carregadas do cache!');
-        return data;
+
+  if (!forceRefresh) {
+    try {
+      const cached = await AsyncStorage.getItem(cacheKey);
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        const horas = (Date.now() - timestamp) / 1000 / 3600;
+        if (horas < CACHE_HORAS) {
+          console.log('Sugestões carregadas do cache!');
+          return data;
+        }
       }
-    }
-  } catch {}
+    } catch {}
+  }
 
   try {
     const response = await fetch(`${BACKEND_URL}/ia/sugestao-food-chaining/${criancaId}`, {

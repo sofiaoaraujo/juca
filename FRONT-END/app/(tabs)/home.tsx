@@ -19,7 +19,7 @@ import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../../context/FilhosContext';
 import { obterSugestoesFoodChaining, type SugestaoAlimento } from '../../services/gemini';
-import { salvarEtapaSOS, buscarEtapasSalvas } from '../../services/progresso';
+import { salvarEtapaSOS, buscarEtapasSalvas, recusarAlimento } from '../../services/progresso';
 import { resolverImagem } from '../../utils/alimentos';
 import { supabase } from '../../services/supabase';
 
@@ -129,6 +129,7 @@ function TrilhaSOS({
   etapasConcluidas,
   onEtapaConcluida,
   onSalvar,
+  onRecusar,
   salvando,
   nomeFilho,
   alimentoNome,
@@ -137,6 +138,7 @@ function TrilhaSOS({
   etapasConcluidas: string[];
   onEtapaConcluida: (id: string, foto?: string) => void;
   onSalvar: () => void;
+  onRecusar: () => void;
   salvando: boolean;
   nomeFilho: string;
   alimentoNome: string;
@@ -295,19 +297,29 @@ function TrilhaSOS({
 
       <View style={{ height: svgHeight }} />
 
-      {/* Botão concluir (progresso já é salvo automaticamente a cada etapa) */}
-      {etapasConcluidas.length > 0 && (
+      {/* Botões de ação */}
+      <View style={trilhaStyles.botoesRow}>
         <TouchableOpacity
           activeOpacity={0.85}
-          style={trilhaStyles.salvarBtn}
-          onPress={onSalvar}
+          style={trilhaStyles.recusarBtn}
+          onPress={onRecusar}
         >
-          <MaterialCommunityIcons name={todasConcluidas ? 'star' : 'check-circle-outline'} size={20} color="#fff" />
-          <Text style={trilhaStyles.salvarText}>
-            {todasConcluidas ? 'Concluir Trilha ⭐' : 'Fechar Trilha'}
-          </Text>
+          <MaterialCommunityIcons name="close-circle-outline" size={18} color="#904c1f" />
+          <Text style={trilhaStyles.recusarText}>Alimento Recusado</Text>
         </TouchableOpacity>
-      )}
+        {etapasConcluidas.length > 0 && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={trilhaStyles.salvarBtn}
+            onPress={onSalvar}
+          >
+            <MaterialCommunityIcons name={todasConcluidas ? 'star' : 'check-circle-outline'} size={20} color="#fff" />
+            <Text style={trilhaStyles.salvarText}>
+              {todasConcluidas ? 'Concluir Trilha ⭐' : 'Fechar Trilha'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* Modal etapa normal */}
       <Modal visible={!!etapaAberta && !etapaAberta?.ehFinal} animationType="slide" transparent onRequestClose={() => setEtapaAberta(null)}>
@@ -401,13 +413,11 @@ export default function Home() {
   const [sugestoes, setSugestoes] = useState<AlimentoSugerido[]>([]);
   const [carregandoSugestoes, setCarregandoSugestoes] = useState(false);
 
-  const carregarSugestoes = async () => {
+  const carregarSugestoes = async (forceRefresh = false) => {
     if (!filhoAtivo?.id) return;
     setCarregandoSugestoes(true);
     try {
-      // ✅ Chamada simplificada enviando apenas o ID!
-      const resultado = await obterSugestoesFoodChaining(filhoAtivo.id);
-      
+      const resultado = await obterSugestoesFoodChaining(filhoAtivo.id, forceRefresh);
       const comCores = resultado.map(s => {
         const cores = CORES_CATEGORIA[s.categoria ?? ''] ?? CORES_CATEGORIA.default;
         return { ...s, name: s.nome, icon: cores.icon, corFundo: cores.fundo, corIcone: cores.icone };
@@ -473,10 +483,34 @@ export default function Home() {
     }
   };
 
-  // Salvar sessão agora apenas fecha a trilha (etapas já foram auto-salvas)
+  // Salvar sessão: fecha a trilha e marca localmente como 'Comer' se concluída
   const salvarSessao = () => {
+    if (alimentoAtivo && etapasTotais.includes('comer')) {
+      const idConcluido = alimentoAtivo.id;
+      setSugestoes(prev => prev.map(s =>
+        s.id === idConcluido ? { ...s, status: 'Comer' } : s
+      ));
+    }
     fecharTrilha();
   };
+
+  const onRecusarAlimento = async () => {
+    if (filhoAtivo?.id && alimentoAtivo?.id) {
+      recusarAlimento(filhoAtivo.id, alimentoAtivo.id).catch(e =>
+        console.error('Erro ao registrar recusa:', e)
+      );
+      const idRecusado = alimentoAtivo.id;
+      setSugestoes(prev => prev.map(s =>
+        s.id === idRecusado ? { ...s, status: 'Recusado' } : s
+      ));
+    }
+    fecharTrilha();
+  };
+
+  // Vaga = alimento que foi concluído ('Comer') ou recusado ('Recusado') na sessão atual
+  const temVagas = sugestoes.some(s => s.status === 'Recusado' || s.status === 'Comer');
+
+  const sugerirNovos = () => carregarSugestoes(true);
 
   const etapasTotais = [...new Set([...etapasAnteriores, ...etapasConcluidas])];
 
@@ -534,9 +568,17 @@ export default function Home() {
             ))}
           </View>
         ) : (
-          <TouchableOpacity activeOpacity={0.8} style={styles.recarregarBox} onPress={carregarSugestoes}>
+          <TouchableOpacity activeOpacity={0.8} style={styles.recarregarBox} onPress={() => carregarSugestoes()}>
             <MaterialCommunityIcons name="refresh" size={24} color="#b22300" />
             <Text style={styles.recarregarText}>Buscar sugestões</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Botão Sugerir Novos — aparece quando há vagas abertas */}
+        {temVagas && !carregandoSugestoes && (
+          <TouchableOpacity activeOpacity={0.85} style={styles.sugerirNovosBtn} onPress={sugerirNovos}>
+            <MaterialCommunityIcons name="shimmer" size={20} color="#b22300" />
+            <Text style={styles.sugerirNovosText}>Sugerir Novos Alimentos</Text>
           </TouchableOpacity>
         )}
 
@@ -616,6 +658,7 @@ export default function Home() {
               etapasConcluidas={etapasTotais}
               onEtapaConcluida={onEtapaConcluida}
               onSalvar={salvarSessao}
+              onRecusar={onRecusarAlimento}
               salvando={salvando}
               nomeFilho={filhoAtivo?.nome ?? 'seu pequeno'}
               alimentoNome={alimentoAtivo?.nome ?? 'o alimento'}
@@ -638,8 +681,11 @@ const trilhaStyles = StyleSheet.create({
   labelRight: { textAlign: 'right' },
   labelConcluida: { color: '#b22300' },
   labelAtual: { color: '#1b1c16' },
-  salvarBtn: { backgroundColor: '#b22300', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 18, borderRadius: 100, marginTop: 16, marginHorizontal: 16, shadowColor: '#b22300', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 16, elevation: 5 },
+  botoesRow: { flexDirection: 'row', gap: 10, marginTop: 16, marginHorizontal: 16 },
+  salvarBtn: { backgroundColor: '#b22300', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 18, borderRadius: 100, flex: 1, shadowColor: '#b22300', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 16, elevation: 5 },
   salvarText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  recusarBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 18, borderRadius: 100, backgroundColor: 'rgba(144,76,31,0.08)', borderWidth: 1.5, borderColor: 'rgba(144,76,31,0.25)' },
+  recusarText: { color: '#904c1f', fontSize: 14, fontWeight: '700' },
   overlay: { flex: 1, backgroundColor: 'rgba(27,28,22,0.5)', justifyContent: 'flex-end' },
   modalCard: { backgroundColor: '#fcf9ef', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: Platform.OS === 'ios' ? 44 : 28, alignItems: 'center', maxHeight: height * 0.9 },
   modalIcone: { width: 72, height: 72, borderRadius: 36, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
@@ -690,11 +736,13 @@ const styles = StyleSheet.create({
   loadingText: { fontSize: 14, color: '#904c1f', textAlign: 'center' },
   recarregarBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 20, marginBottom: 28, backgroundColor: '#fff5f3', borderRadius: 16, borderWidth: 1.5, borderColor: 'rgba(178,35,0,0.15)' },
   recarregarText: { fontSize: 15, fontWeight: '700', color: '#b22300' },
+  sugerirNovosBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16, borderRadius: 100, backgroundColor: '#fff5f3', borderWidth: 1.5, borderColor: 'rgba(178,35,0,0.2)', marginBottom: 28 },
+  sugerirNovosText: { fontSize: 15, fontWeight: '700', color: '#b22300' },
   foodCard: { width: '47%', borderRadius: 28, padding: 18, alignItems: 'stretch', shadowColor: '#4b4944', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.06, shadowRadius: 32, elevation: 3 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 12 },
-  cardCategoria: { fontSize: 10, fontWeight: '700', color: '#904c1f', letterSpacing: 1.5 },
-  badgeAndamento: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(178,35,0,0.08)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 100 },
-  badgeAndamentoText: { fontSize: 9, fontWeight: '700', color: '#b22300', letterSpacing: 0.5 },
+  cardCategoria: { fontSize: 10, fontWeight: '700', color: '#904c1f', letterSpacing: 1.5, flex: 1, flexShrink: 1 },
+  badgeAndamento: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(178,35,0,0.08)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 100, flexShrink: 0, marginLeft: 4 },
+  badgeAndamentoText: { fontSize: 9, fontWeight: '700', color: '#b22300', letterSpacing: 0 },
   iconeCircle: { width: 96, height: 96, borderRadius: 48, justifyContent: 'center', alignItems: 'center', marginBottom: 14, overflow: 'hidden', alignSelf: 'center' },
   cardImagem: { width: 72, height: 72 },
   cardNome: { fontSize: 15, fontWeight: '800', color: '#1b1c16', textAlign: 'center', marginBottom: 6 },

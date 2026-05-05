@@ -93,6 +93,24 @@ export async function buscarHistoricoIA(criancaId: string): Promise<HistoricoIAI
 }
 
 /**
+ * Encerra a tentativa com um alimento registrando status "Recusado".
+ */
+export async function recusarAlimento(
+  criancaId: string,
+  alimentoId: string,
+): Promise<boolean> {
+  try {
+    await api.post('/progresso/recusar', {
+      crianca_id: criancaId,
+      alimento_id: alimentoId,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Registra múltiplas etapas SOS em lote (usado pelo login/onboarding).
  */
 export async function registrarEtapasSOS(params: {

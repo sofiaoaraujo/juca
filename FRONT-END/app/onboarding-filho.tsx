@@ -168,11 +168,16 @@ export default function OnboardingFilho() {
         }
 
         if (alimento?.id) {
-          await api.post('/progresso/', {
-            crianca_id: criancaId,
-            alimento_id: alimento.id,
-            status: 'Comer',
-          });
+          // Alimento já consumido: registra todas as etapas SOS em ordem
+          // para que o relatório mostre 100% e todas as etapas marcadas.
+          const etapasCompletas = ['Tolerar', 'Interagir', 'Cheirar', 'Tocar', 'Saborear', 'Comer'];
+          for (const status of etapasCompletas) {
+            await api.post('/progresso/', {
+              crianca_id: criancaId,
+              alimento_id: alimento.id,
+              status,
+            });
+          }
         }
       }
 
