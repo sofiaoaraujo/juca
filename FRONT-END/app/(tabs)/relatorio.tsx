@@ -45,7 +45,8 @@ const calcularIdade = (dataNasc: string): string => {
   return m > 0 ? `${anos} anos e ${m} meses` : `${anos} anos`;
 };
 
-const calcProgresso = (etapas: string[]) => Math.round((etapas.length / 6) * 100);
+const calcProgresso = (etapas: string[]) =>
+  Math.round((etapas.filter(e => e !== 'Recusado').length / 6) * 100);
 
 // ─── Seção colapsável ─────────────────────────────────────────────────────────
 function Secao({
@@ -232,17 +233,23 @@ export default function Relatorio() {
       const sessoesHTML = historicoIA
         .map(s => {
           const pct = calcProgresso(s.etapas_concluidas);
+          const eRecusado = s.etapa_atual === 'Recusado';
           const etapasHTML = STATUS_DISPLAY.map(({ key, label }) => {
             const feita = s.etapas_concluidas.includes(key);
             return `<span style="display:inline-block;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600;margin:2px;background:${feita ? '#b22300' : '#f0eee4'};color:${feita ? '#fff' : '#5e5c54'};">${label}</span>`;
-          }).join('');
+          }).join('') + (eRecusado
+            ? `<span style="display:inline-block;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600;margin:2px;background:#5e5c54;color:#fff;">Recusado</span>`
+            : '');
+          const badgeHTML = eRecusado
+            ? `<span style="background:#5e5c54;color:#fff;padding:4px 10px;border-radius:100px;font-weight:700;font-size:12px;">Recusado</span>`
+            : `<span style="background:${pct >= 80 ? '#b22300' : '#f6f4ea'};color:${pct >= 80 ? '#fff' : '#5e5c54'};padding:4px 10px;border-radius:100px;font-weight:700;">${pct}%</span>`;
           return `<div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:8px;border:1px solid #f0eee4;">
             <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
               <div>
                 <strong>${s.alimento?.nome ?? ''}</strong><br/>
                 <span style="font-size:12px;color:#5e5c54;">${formatarData(s.created_at)}</span>
               </div>
-              <span style="background:${pct >= 80 ? '#b22300' : '#f6f4ea'};color:${pct >= 80 ? '#fff' : '#5e5c54'};padding:4px 10px;border-radius:100px;font-weight:700;">${pct}%</span>
+              ${badgeHTML}
             </div>
             ${s.justificativa_ia ? `<p style="font-size:11px;color:#904c1f;margin:0 0 8px;font-style:italic;">${s.justificativa_ia}</p>` : ''}
             <div>${etapasHTML}</div>
@@ -470,11 +477,17 @@ export default function Relatorio() {
                       <Text style={styles.sessaoAlimento}>{s.alimento?.nome}</Text>
                       <Text style={styles.sessaoData}>{formatarData(s.created_at)}</Text>
                     </View>
-                    <View style={[styles.pctBadge, pct >= 80 && styles.pctBadgeAlto]}>
-                      <Text style={[styles.pctText, pct >= 80 && styles.pctTextClaro]}>
-                        {pct}%
-                      </Text>
-                    </View>
+                    {s.etapa_atual === 'Recusado' ? (
+                      <View style={styles.recusadoBadge}>
+                        <Text style={styles.recusadoBadgeText}>Recusado</Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.pctBadge, pct >= 80 && styles.pctBadgeAlto]}>
+                        <Text style={[styles.pctText, pct >= 80 && styles.pctTextClaro]}>
+                          {pct}%
+                        </Text>
+                      </View>
+                    )}
                   </View>
 
                   {/* Motivo da sugestão da IA */}
@@ -729,6 +742,8 @@ const styles = StyleSheet.create({
   pctBadgeAlto: { backgroundColor: '#b22300' },
   pctText: { fontSize: 12, fontWeight: '800', color: '#5e5c54' },
   pctTextClaro: { color: '#fff' },
+  recusadoBadge: { backgroundColor: '#5e5c54', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 100 },
+  recusadoBadgeText: { fontSize: 12, fontWeight: '800', color: '#fff' },
 
   justificativaText: {
     fontSize: 11,

@@ -14,48 +14,113 @@ GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1
 GEMINI_HEADERS = {"Content-Type": "application/json", "x-goog-api-key": CHAVE_API}
 
 # ---------------------------------------------------------------------------
-# Motor de Food Chaining (Sugestões para Home)
+# Motor de Food Chaining com Renovação Parcial (Sugestões para Home)
 # ---------------------------------------------------------------------------
+SENSORY_DEFAULTS = {
+    'maçã': {'textura': 'crocante', 'cor': 'vermelha', 'sabor': 'doce'},
+    'maca': {'textura': 'crocante', 'cor': 'vermelha', 'sabor': 'doce'},
+    'melancia': {'textura': 'aquosa', 'cor': 'vermelha', 'sabor': 'doce'},
+    'banana': {'textura': 'macia', 'cor': 'amarela', 'sabor': 'doce'},
+    'mamão': {'textura': 'macia', 'cor': 'laranja', 'sabor': 'doce'},
+    'mamao': {'textura': 'macia', 'cor': 'laranja', 'sabor': 'doce'},
+    'manga': {'textura': 'macia', 'cor': 'amarela', 'sabor': 'doce'},
+    'pera': {'textura': 'crocante', 'cor': 'verde', 'sabor': 'doce'},
+    'uva': {'textura': 'aquosa', 'cor': 'roxa', 'sabor': 'doce'},
+    'morango': {'textura': 'macia', 'cor': 'vermelha', 'sabor': 'doce'},
+    'cenoura': {'textura': 'crocante', 'cor': 'laranja', 'sabor': 'doce'},
+    'brócolis': {'textura': 'firme', 'cor': 'verde', 'sabor': 'amargo'},
+    'brocolis': {'textura': 'firme', 'cor': 'verde', 'sabor': 'amargo'},
+    'abobrinha': {'textura': 'macia', 'cor': 'verde', 'sabor': 'neutro'},
+    'beterraba': {'textura': 'firme', 'cor': 'roxa', 'sabor': 'doce'},
+    'chuchu': {'textura': 'macia', 'cor': 'verde', 'sabor': 'neutro'},
+    'arroz': {'textura': 'macia', 'cor': 'branca', 'sabor': 'neutro'},
+    'batata': {'textura': 'macia', 'cor': 'amarela', 'sabor': 'neutro'},
+    'batata-doce': {'textura': 'macia', 'cor': 'laranja', 'sabor': 'doce'},
+    'macarrão': {'textura': 'macia', 'cor': 'amarela', 'sabor': 'neutro'},
+    'macarrao': {'textura': 'macia', 'cor': 'amarela', 'sabor': 'neutro'},
+    'mandioca': {'textura': 'firme', 'cor': 'branca', 'sabor': 'neutro'},
+    'feijão': {'textura': 'macia', 'cor': 'marrom', 'sabor': 'salgado'},
+    'feijao': {'textura': 'macia', 'cor': 'marrom', 'sabor': 'salgado'},
+    'ovo': {'textura': 'macia', 'cor': 'amarela', 'sabor': 'neutro'},
+    'frango': {'textura': 'firme', 'cor': 'bege', 'sabor': 'salgado'},
+    'carne moída': {'textura': 'macia', 'cor': 'marrom', 'sabor': 'salgado'},
+    'carne moida': {'textura': 'macia', 'cor': 'marrom', 'sabor': 'salgado'},
+    'inhame': {'textura': 'macia', 'cor': 'branca', 'sabor': 'neutro'},
+}
+
+TOTAL_CARDS = 2
+# Statuses que liberam uma vaga para nova sugestão
+STATUSES_LIBERADOS = {"Comer", "Recusado"}
+
+
 @router.post("/sugestao-food-chaining/{crianca_id}")
 async def obter_sugestao(crianca_id: str):
     try:
-        # ---------------------------------------------------------------------------
-        # TRAVA DE GERAÇÃO: verifica trilha SOS ativa antes de chamar o LLM.
-        # "Ativa" = sugestao_ia=true E status ainda não chegou em "Comer".
-        # Se existir ao menos uma linha nesse estado, a trilha não terminou —
-        # devolvemos o cache sem gastar quota da API.
-        # ---------------------------------------------------------------------------
-        sugestoes_em_andamento = (
+        # ── Passo 1: Todo o progresso da criança em uma única query ──────────────
+        # Ordenado por created_at DESC para que a primeira ocorrência de cada
+        # alimento_id seja sempre a linha mais recente (status mais atual).
+        todo_progresso = (
             supabase.table("crianca_alimento")
-            .select("status, justificativa_ia, alimentos(id, nome, textura, cor, sabor, categoria)")
+            .select("alimento_id, status, sugestao_ia, justificativa_ia, created_at, alimentos(id, nome, textura, cor, sabor, categoria)")
             .eq("crianca_id", crianca_id)
-            .eq("sugestao_ia", True)
-            .neq("status", "Comer")
+            .order("created_at", desc=True)
+            .execute()
+        ).data
+
+        # Quais alimento_ids foram sugeridos pela IA (têm ao menos uma linha sugestao_ia=True)
+        ia_ids: set = {row["alimento_id"] for row in todo_progresso if row.get("sugestao_ia") is True}
+
+        # Mapas construídos em uma passagem (rows já em DESC → primeiro = mais recente)
+        latest_status: dict = {}   # alimento_id → status mais recente
+        justificativas: dict = {}  # alimento_id → justificativa_ia (da linha IA)
+        alimentos_info: dict = {}  # alimento_id → dados do alimento
+        for row in todo_progresso:
+            aid = row["alimento_id"]
+            if aid not in latest_status:
+                latest_status[aid] = row["status"]
+                alimentos_info[aid] = row.get("alimentos") or {}
+            if row.get("sugestao_ia") is True and aid not in justificativas:
+                justificativas[aid] = row.get("justificativa_ia")
+
+        # ── Passo 2: Classificar alimentos IA ────────────────────────────────────
+        # Preservados = sugeridos pela IA cujo status mais recente NÃO foi liberado.
+        # Vagas = slots disponíveis para novas sugestões.
+        preservados = [aid for aid in ia_ids if latest_status.get(aid) not in STATUSES_LIBERADOS]
+        vagas = max(0, TOTAL_CARDS - len(preservados))
+
+        print(f"[Food Chaining] crianca={crianca_id} | ia_ids={len(ia_ids)} | preservados={len(preservados)} | vagas={vagas}")
+
+        # ── Passo 3: Montar resposta dos alimentos preservados ───────────────────
+        sugestoes_preservadas = []
+        for aid in preservados:
+            info = alimentos_info.get(aid) or {}
+            st = latest_status.get(aid)
+            sugestoes_preservadas.append({
+                "id": aid,
+                "novo": False,
+                "nome": info.get("nome"),
+                "motivo": justificativas.get(aid),
+                "forma_preparo": None,
+                "categoria": info.get("categoria"),
+                "textura": info.get("textura"),
+                "cor": info.get("cor"),
+                "sabor": info.get("sabor"),
+                # 'Pendente' = sugerido mas trilha ainda não iniciada → sem badge "Em andamento"
+                "status": st if st != "Pendente" else None,
+            })
+
+        # Sem vagas → retorna apenas os preservados sem chamar o LLM
+        if vagas == 0:
+            print(f"[Food Chaining] Sem vagas. Retornando {len(sugestoes_preservadas)} alimento(s) preservado(s).")
+            return {"sugestoes": sugestoes_preservadas, "origem": "cache"}
+
+        # ── Passo 4: Buscar base para o LLM ──────────────────────────────────────
+        alergias_data = (
+            supabase.table("crianca_alergia")
+            .select("alergias(nome)")
+            .eq("crianca_id", crianca_id)
             .execute()
         )
-
-        if sugestoes_em_andamento.data:
-            print(f"[Food Chaining] Trilha SOS ativa encontrada para crianca_id={crianca_id}. Retornando cache sem chamar LLM.")
-            sugestoes_cache = []
-            for row in sugestoes_em_andamento.data:
-                alimento = row.get("alimentos") or {}
-                sugestoes_cache.append({
-                    "id": alimento.get("id"),
-                    "novo": False,
-                    "nome": alimento.get("nome"),
-                    "motivo": row.get("justificativa_ia"),
-                    "forma_preparo": None,
-                    "categoria": alimento.get("categoria"),
-                    "textura": alimento.get("textura"),
-                    "cor": alimento.get("cor"),
-                    "sabor": alimento.get("sabor"),
-                    "status": row.get("status"),
-                })
-            return {"sugestoes": sugestoes_cache, "origem": "cache"}
-
-        print(f"[Food Chaining] Sem trilha ativa para crianca_id={crianca_id}. Chamando LLM.")
-
-        alergias_data = supabase.table("crianca_alergia").select("alergias(nome)").eq("crianca_id", crianca_id).execute()
         alergias_lista = [item['alergias']['nome'] for item in alergias_data.data if item.get('alergias')]
 
         historico_sucesso = (
@@ -67,65 +132,29 @@ async def obter_sugestao(crianca_id: str):
         )
         alimentos_aceitos = [h['alimentos'] for h in historico_sucesso.data if h.get('alimentos')]
 
+        # Sem base de alimentos aceitos → não é possível gerar novas sugestões
         if not alimentos_aceitos:
-            raise HTTPException(
-                status_code=400,
-                detail="A criança ainda não possui alimentos com status 'Comer'. Registre ao menos um alimento aceito antes de usar o Food Chaining.",
-            )
+            print(f"[Food Chaining] Sem alimentos 'Comer'. Retornando apenas preservados.")
+            return {"sugestoes": sugestoes_preservadas, "origem": "cache"}
 
-        todos_na_trilha = (
-            supabase.table("crianca_alimento")
-            .select("alimento_id")
-            .eq("crianca_id", crianca_id)
-            .execute()
-        )
-        ids_na_trilha = [h['alimento_id'] for h in todos_na_trilha.data]
+        # Todos os IDs já na trilha da criança (evita repetição nas novas sugestões)
+        ids_na_trilha = list(latest_status.keys())
 
-        SENSORY_DEFAULTS = {
-            'maçã': {'textura': 'crocante', 'cor': 'vermelha', 'sabor': 'doce'},
-            'maca': {'textura': 'crocante', 'cor': 'vermelha', 'sabor': 'doce'},
-            'melancia': {'textura': 'aquosa', 'cor': 'vermelha', 'sabor': 'doce'},
-            'banana': {'textura': 'macia', 'cor': 'amarela', 'sabor': 'doce'},
-            'mamão': {'textura': 'macia', 'cor': 'laranja', 'sabor': 'doce'},
-            'mamao': {'textura': 'macia', 'cor': 'laranja', 'sabor': 'doce'},
-            'manga': {'textura': 'macia', 'cor': 'amarela', 'sabor': 'doce'},
-            'pera': {'textura': 'crocante', 'cor': 'verde', 'sabor': 'doce'},
-            'uva': {'textura': 'aquosa', 'cor': 'roxa', 'sabor': 'doce'},
-            'morango': {'textura': 'macia', 'cor': 'vermelha', 'sabor': 'doce'},
-            'cenoura': {'textura': 'crocante', 'cor': 'laranja', 'sabor': 'doce'},
-            'brócolis': {'textura': 'firme', 'cor': 'verde', 'sabor': 'amargo'},
-            'brocolis': {'textura': 'firme', 'cor': 'verde', 'sabor': 'amargo'},
-            'abobrinha': {'textura': 'macia', 'cor': 'verde', 'sabor': 'neutro'},
-            'beterraba': {'textura': 'firme', 'cor': 'roxa', 'sabor': 'doce'},
-            'chuchu': {'textura': 'macia', 'cor': 'verde', 'sabor': 'neutro'},
-            'arroz': {'textura': 'macia', 'cor': 'branca', 'sabor': 'neutro'},
-            'batata': {'textura': 'macia', 'cor': 'amarela', 'sabor': 'neutro'},
-            'batata-doce': {'textura': 'macia', 'cor': 'laranja', 'sabor': 'doce'},
-            'macarrão': {'textura': 'macia', 'cor': 'amarela', 'sabor': 'neutro'},
-            'macarrao': {'textura': 'macia', 'cor': 'amarela', 'sabor': 'neutro'},
-            'mandioca': {'textura': 'firme', 'cor': 'branca', 'sabor': 'neutro'},
-            'feijão': {'textura': 'macia', 'cor': 'marrom', 'sabor': 'salgado'},
-            'feijao': {'textura': 'macia', 'cor': 'marrom', 'sabor': 'salgado'},
-            'ovo': {'textura': 'macia', 'cor': 'amarela', 'sabor': 'neutro'},
-            'frango': {'textura': 'firme', 'cor': 'bege', 'sabor': 'salgado'},
-            'carne moída': {'textura': 'macia', 'cor': 'marrom', 'sabor': 'salgado'},
-            'carne moida': {'textura': 'macia', 'cor': 'marrom', 'sabor': 'salgado'},
-            'inhame': {'textura': 'macia', 'cor': 'branca', 'sabor': 'neutro'},
-        }
-
+        # Preenche atributos sensoriais ausentes com os defaults conhecidos
         for alimento in alimentos_aceitos:
             if alimento:
                 nome_lower = alimento.get('nome', '').lower().strip()
                 defaults = SENSORY_DEFAULTS.get(nome_lower, {})
-                if not alimento.get('textura') and defaults.get('textura'):
-                    alimento['textura'] = defaults['textura']
-                if not alimento.get('cor') and defaults.get('cor'):
-                    alimento['cor'] = defaults['cor']
-                if not alimento.get('sabor') and defaults.get('sabor'):
-                    alimento['sabor'] = defaults['sabor']
+                for campo in ('textura', 'cor', 'sabor'):
+                    if not alimento.get(campo) and defaults.get(campo):
+                        alimento[campo] = defaults[campo]
 
         catalogo = supabase.table("alimentos").select("id, nome, textura, cor, sabor, categoria").execute()
         catalogo_por_id = {a["id"]: a.get("categoria") for a in catalogo.data if a.get("id")}
+
+        # ── Passo 5: Chamar o LLM pedindo apenas as vagas necessárias ────────────
+        origem = "parcial" if sugestoes_preservadas else "llm"
+        print(f"[Food Chaining] Chamando LLM para {vagas} nova(s) sugestão(ões). Origem={origem}.")
 
         prompt = f"""
         Você é um nutricionista pediátrico especialista no método Food Chaining para crianças com hipersensibilidade sensorial e dificuldades alimentares.
@@ -145,7 +174,7 @@ async def obter_sugestao(crianca_id: str):
 
         REGRAS DE FOOD CHAINING:
         1. RESTRIÇÃO ABSOLUTA: Nunca sugira alimentos que contenham ou sejam derivados dos itens em "Alergias".
-        2. SEMELHANÇA REAL: A conexão deve ser baseada em textura, cor e sabor dos alimentos que a criança JÁ ACEITA. Se algum atributo ainda estiver nulo, use seu conhecimento nutricional para inferir as propriedades a partir do nome do alimento (ex: Maçã → crocante, vermelha/verde, doce; Melancia → aquosa, vermelha, doce) e então faça a comparação. NUNCA ignore os alimentos aceitos por falta de atributos.
+        2. SEMELHANÇA REAL: A conexão deve ser baseada em textura, cor e sabor dos alimentos que a criança JÁ ACEITA. Se algum atributo ainda estiver nulo, use seu conhecimento nutricional para inferir as propriedades a partir do nome do alimento e então faça a comparação. NUNCA ignore os alimentos aceitos por falta de atributos.
         3. FORMA DE PREPARO: Sugira a forma de preparo que mais aproxima o novo alimento do que a criança já aceita.
         4. INTRODUÇÃO GRADUAL: O novo alimento deve ser apresentado ao lado do alimento seguro, em pequenas quantidades, sem pressão.
         5. ESPECIFICIDADE: Seja específico. Não diga "feijão" — diga "feijão verde cozido" ou "feijão carioca amassado".
@@ -159,7 +188,7 @@ async def obter_sugestao(crianca_id: str):
         - Passo 3: Se NÃO encontrar nenhum alimento adequado no catálogo: crie uma sugestão nova.
           → Preencha "id" como null e "novo" como true. Defina nome, textura, cor e sabor com precisão.
 
-        Selecione 2 sugestões (priorizando o catálogo, mas criando novas quando necessário).
+        Selecione EXATAMENTE {vagas} sugestão(ões) (priorizando o catálogo, mas criando novas quando necessário).
 
         Retorne SOMENTE um JSON válido, sem texto adicional:
         {{
@@ -179,20 +208,20 @@ async def obter_sugestao(crianca_id: str):
         }}
         """
 
-        payload = {
+        payload_llm = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"temperature": 0.4}
         }
 
-        response = requests.post(GEMINI_URL, json=payload, headers=GEMINI_HEADERS)
+        response = requests.post(GEMINI_URL, json=payload_llm, headers=GEMINI_HEADERS)
         response.raise_for_status()
 
         dados = response.json()
         texto = dados['candidates'][0]['content']['parts'][0]['text']
-
         texto_limpo = texto.strip().replace("```json", "").replace("```", "").strip()
         resultado = json.loads(texto_limpo)
 
+        # ── Passo 6: Pós-processamento — enriquecer categoria e persistir ─────────
         for sugestao in resultado.get("sugestoes", []):
             aid = sugestao.get("id")
             if aid and catalogo_por_id.get(aid):
@@ -207,7 +236,6 @@ async def obter_sugestao(crianca_id: str):
                     "sabor": sugestao.get("sabor"),
                     "categoria": sugestao.get("categoria"),
                 }.items() if v is not None}
-
                 inserido = supabase.table("alimentos").insert(novo_alimento).execute()
                 if inserido.data:
                     sugestao["id"] = inserido.data[0]["id"]
@@ -215,11 +243,8 @@ async def obter_sugestao(crianca_id: str):
         inseridos_nesta_chamada: set = set()
         for sugestao in resultado.get("sugestoes", []):
             aid = sugestao.get("id")
-            if not aid:
+            if not aid or aid in ids_na_trilha or aid in inseridos_nesta_chamada:
                 continue
-            if aid in ids_na_trilha or aid in inseridos_nesta_chamada:
-                continue
-
             supabase.table("crianca_alimento").insert({
                 "crianca_id": crianca_id,
                 "alimento_id": aid,
@@ -229,7 +254,11 @@ async def obter_sugestao(crianca_id: str):
             }).execute()
             inseridos_nesta_chamada.add(aid)
 
-        return resultado
+        # Preservados primeiro (fixos), novas sugestões depois (vagas preenchidas)
+        return {
+            "sugestoes": sugestoes_preservadas + resultado.get("sugestoes", []),
+            "origem": origem,
+        }
 
     except Exception as e:
         print(f"Erro detalhado no Food Chaining: {str(e)}")

@@ -64,6 +64,12 @@ class ProgressoCreate(BaseModel):
         return valor
 
 
+class RecusarPayload(BaseModel):
+    """Payload para encerrar a tentativa com um alimento como recusado."""
+    crianca_id: UUID
+    alimento_id: UUID
+
+
 class ProgressoUpdate(BaseModel):
     """
     Payload para atualizar a etapa de um progresso já existente.

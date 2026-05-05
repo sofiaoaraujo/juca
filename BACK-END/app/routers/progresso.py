@@ -16,6 +16,7 @@ from app.schemas.progresso import (
     ProgressoUpdate,
     ProgressoResponse,
     ProgressoComAlimentoResponse,
+    RecusarPayload,
 )
 
 router = APIRouter(prefix="/progresso", tags=["Progresso (Trilha ABA)"])
@@ -146,6 +147,58 @@ async def buscar_trilha_da_crianca(crianca_id: UUID):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao buscar trilha da criança: {str(e)}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# POST /progresso/recusar — Encerrar tentativa com status "Recusado"
+# ---------------------------------------------------------------------------
+@router.post(
+    "/recusar",
+    response_model=ProgressoResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Registrar recusa de um alimento por uma criança",
+)
+async def recusar_alimento(payload: RecusarPayload):
+    """
+    Encerra a tentativa com o alimento marcando-o como 'Recusado'.
+    Idempotente: se já existir um registro com status 'Recusado' para o par
+    crianca+alimento, retorna o registro existente sem criar duplicata.
+    """
+    try:
+        existente = (
+            supabase.table("crianca_alimento")
+            .select("*")
+            .eq("crianca_id", str(payload.crianca_id))
+            .eq("alimento_id", str(payload.alimento_id))
+            .eq("status", "Recusado")
+            .limit(1)
+            .execute()
+        )
+        if existente.data:
+            return existente.data[0]
+
+        dados = {
+            "crianca_id": str(payload.crianca_id),
+            "alimento_id": str(payload.alimento_id),
+            "status": "Recusado",
+        }
+        resposta = supabase.table("crianca_alimento").insert(dados).execute()
+
+        if not resposta.data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Não foi possível registrar a recusa.",
+            )
+
+        return resposta.data[0]
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao registrar recusa: {str(e)}",
         )
 
 
