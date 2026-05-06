@@ -29,6 +29,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="galeria"
+        options={{
+          title: 'Galeria',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="photo.stack.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="Configuracoes"
         options={{
           title: 'Configurações',

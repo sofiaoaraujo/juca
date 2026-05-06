@@ -17,6 +17,7 @@ from app.schemas.progresso import (
     ProgressoResponse,
     ProgressoComAlimentoResponse,
     RecusarPayload,
+    FotoConquistaPayload,
 )
 
 router = APIRouter(prefix="/progresso", tags=["Progresso (Trilha ABA)"])
@@ -103,6 +104,37 @@ async def registrar_progresso(payload: ProgressoCreate):
 
 
 # ---------------------------------------------------------------------------
+# GET /progresso/crianca/{crianca_id}/galeria — Fotos de conquistas
+# DEVE vir antes de /crianca/{crianca_id} para evitar conflito de rota.
+# ---------------------------------------------------------------------------
+@router.get(
+    "/crianca/{crianca_id}/galeria",
+    summary="Buscar fotos de conquistas da criança (etapa Comer com foto)",
+)
+async def buscar_galeria_conquistas(crianca_id: UUID):
+    """
+    Retorna todos os registros de crianca_alimento com status='Comer'
+    que possuam foto_url preenchida, junto com o nome do alimento.
+    """
+    try:
+        resposta = (
+            supabase.table("crianca_alimento")
+            .select("id, foto_url, created_at, alimentos(id, nome)")
+            .eq("crianca_id", str(crianca_id))
+            .eq("status", "Comer")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        # Filtra apenas os que têm foto_url preenchido
+        return [r for r in (resposta.data or []) if r.get("foto_url")]
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao buscar galeria: {str(e)}",
+        )
+
+
 # GET /progresso/crianca/{crianca_id} — Buscar trilha completa de uma criança
 # ---------------------------------------------------------------------------
 @router.get(
@@ -199,6 +231,43 @@ async def recusar_alimento(payload: RecusarPayload):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao registrar recusa: {str(e)}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# PATCH /progresso/foto — Salvar URL da foto de conquista (etapa Comer)
+# DEVE vir antes de /{progresso_id} para evitar que "foto" seja capturado
+# como UUID pelo roteador do FastAPI.
+# ---------------------------------------------------------------------------
+@router.patch(
+    "/foto",
+    summary="Salvar URL da foto de conquista na etapa Comer",
+)
+async def salvar_foto_conquista(payload: FotoConquistaPayload):
+    try:
+        resposta = (
+            supabase.table("crianca_alimento")
+            .update({"foto_url": payload.foto_url})
+            .eq("crianca_id", str(payload.crianca_id))
+            .eq("alimento_id", str(payload.alimento_id))
+            .eq("status", "Comer")
+            .execute()
+        )
+
+        if not resposta.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Registro Comer não encontrado para este par criança+alimento.",
+            )
+
+        return {"foto_url": payload.foto_url}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao salvar foto: {str(e)}",
         )
 
 

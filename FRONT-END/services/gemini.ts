@@ -39,7 +39,7 @@ export async function obterSugestoesFoodChaining(criancaId: string, forceRefresh
           return data;
         }
       }
-    } catch {}
+    } catch { }
   }
 
   try {
@@ -63,7 +63,7 @@ export async function obterSugestoesFoodChaining(criancaId: string, forceRefresh
     // Salva no cache
     try {
       await AsyncStorage.setItem(cacheKey, JSON.stringify({ data: sugestoes, timestamp: Date.now() }));
-    } catch {}
+    } catch { }
 
     return sugestoes;
   } catch (error) {

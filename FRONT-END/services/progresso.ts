@@ -1,4 +1,5 @@
 import api from './api';
+import { supabase } from './supabase';
 
 export type HistoricoIAItem = {
   alimento_id: string;
@@ -71,7 +72,7 @@ export async function buscarEtapasSalvas(
     const { data } = await api.get<string[]>(
       `/progresso/crianca/${criancaId}/alimento/${alimentoId}/etapas`,
     );
-    return (data ?? []).map(s => STATUS_TO_ETAPA[s]).filter(Boolean);
+    return (data ?? []).map((s: string) => STATUS_TO_ETAPA[s]).filter(Boolean);
   } catch {
     return [];
   }
@@ -107,6 +108,47 @@ export async function recusarAlimento(
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Faz upload da foto da conquista "Comer" para o bucket galeria_conquistas
+ * e persiste a URL pública na coluna foto_url da tabela crianca_alimento.
+ */
+export async function uploadFotoConquista(
+  localUri: string,
+  criancaId: string,
+  alimentoId: string,
+): Promise<string | null> {
+  try {
+    const ext = localUri.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
+    const contentType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
+    const filePath = `${criancaId}/${alimentoId}_${Date.now()}.${ext}`;
+
+    const arraybuffer = await fetch(localUri).then(r => r.arrayBuffer());
+
+    const { error: uploadError } = await supabase.storage
+      .from('galeria_conquistas')
+      .upload(filePath, arraybuffer, { contentType, upsert: true });
+
+    if (uploadError) throw uploadError;
+
+    const { data: urlData } = supabase.storage
+      .from('galeria_conquistas')
+      .getPublicUrl(filePath);
+
+    const fotoUrl = urlData.publicUrl;
+
+    await api.patch('/progresso/foto', {
+      crianca_id: criancaId,
+      alimento_id: alimentoId,
+      foto_url: fotoUrl,
+    });
+
+    return fotoUrl;
+  } catch (e) {
+    console.error('Erro ao fazer upload da foto conquista:', e);
+    return null;
   }
 }
 

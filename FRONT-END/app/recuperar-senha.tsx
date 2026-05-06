@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -26,6 +26,8 @@ export default function RecuperarSenha() {
   const [confirmarSenhaVisivel, setConfirmarSenhaVisivel] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
+  const novaSenhaRef = useRef<any>(null);
+  const confirmarSenhaRef = useRef<any>(null);
 
   const handleEnviarCodigo = async () => {
     setCarregando(true);
@@ -129,6 +131,8 @@ export default function RecuperarSenha() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoFocus
+                  returnKeyType="go"
+                  onSubmitEditing={() => { if (email) handleEnviarCodigo(); }}
                 />
               </View>
 
@@ -166,6 +170,9 @@ export default function RecuperarSenha() {
                   onChangeText={t => { setCodigo(t); setErro(''); }}
                   keyboardType="number-pad"
                   maxLength={6}
+                  returnKeyType="next"
+                  onSubmitEditing={() => novaSenhaRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
               </View>
 
@@ -173,12 +180,16 @@ export default function RecuperarSenha() {
               <View style={styles.inputBox}>
                 <MaterialCommunityIcons name="lock-outline" size={20} color="#5e5c54" style={{ marginRight: 12 }} />
                 <TextInput
+                  ref={novaSenhaRef}
                   style={styles.input}
                   placeholder="••••••••"
                   placeholderTextColor="rgba(94,92,84,0.5)"
                   value={novaSenha}
                   onChangeText={t => { setNovaSenha(t); setErro(''); }}
                   secureTextEntry={!novaSenhaVisivel}
+                  returnKeyType="next"
+                  onSubmitEditing={() => confirmarSenhaRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
                 <TouchableOpacity activeOpacity={0.7} onPress={() => setNovaSenhaVisivel(v => !v)}>
                   <MaterialCommunityIcons
@@ -196,12 +207,15 @@ export default function RecuperarSenha() {
               <View style={styles.inputBox}>
                 <MaterialCommunityIcons name="lock-check-outline" size={20} color="#5e5c54" style={{ marginRight: 12 }} />
                 <TextInput
+                  ref={confirmarSenhaRef}
                   style={styles.input}
                   placeholder="••••••••"
                   placeholderTextColor="rgba(94,92,84,0.5)"
                   value={confirmarSenha}
                   onChangeText={t => { setConfirmarSenha(t); setErro(''); }}
                   secureTextEntry={!confirmarSenhaVisivel}
+                  returnKeyType="go"
+                  onSubmitEditing={handleRedefinirSenha}
                 />
                 <TouchableOpacity activeOpacity={0.7} onPress={() => setConfirmarSenhaVisivel(v => !v)}>
                   <MaterialCommunityIcons

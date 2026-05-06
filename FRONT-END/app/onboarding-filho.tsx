@@ -5,11 +5,13 @@ import {
   Alert,
   Dimensions,
   Image,
+  Keyboard,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { resolverImagem } from '../utils/alimentos';
@@ -243,6 +245,8 @@ export default function OnboardingFilho() {
           value={nome}
           onChangeText={setNome}
           autoFocus
+          returnKeyType="done"
+          onSubmitEditing={() => { if (nome) nextStep(); }}
         />
       </View>
       <ArrowButton onPress={nextStep} disabled={!nome} />
@@ -251,24 +255,26 @@ export default function OnboardingFilho() {
 
   // Step 1 — Data de nascimento
   if (step === 1) return (
-    <SafeAreaView style={styles.fullScreen}>
-      <Header />
-      <Text style={styles.questionText}>Quando {nome} nasceu?</Text>
-      <View style={styles.inputBlock}>
-        <MaskInput
-          style={styles.textInput}
-          placeholder="DD / MM / AAAA"
-          placeholderTextColor="#5e5c5480"
-          keyboardType="numeric"
-          maxLength={10}
-          value={dataNasc}
-          mask={dataMask}
-          onChangeText={(masked) => setDataNasc(masked)}
-        />
-        <MaterialCommunityIcons name="calendar-month-outline" size={20} color="#5e5c54" />
-      </View>
-      <ArrowButton onPress={nextStep} disabled={dataNasc.length < 10} />
-    </SafeAreaView>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <SafeAreaView style={styles.fullScreen}>
+        <Header />
+        <Text style={styles.questionText}>Quando {nome} nasceu?</Text>
+        <View style={styles.inputBlock}>
+          <MaskInput
+            style={styles.textInput}
+            placeholder="DD / MM / AAAA"
+            placeholderTextColor="#5e5c5480"
+            keyboardType="numeric"
+            maxLength={10}
+            value={dataNasc}
+            mask={dataMask}
+            onChangeText={(masked) => setDataNasc(masked)}
+          />
+          <MaterialCommunityIcons name="calendar-month-outline" size={20} color="#5e5c54" />
+        </View>
+        <ArrowButton onPress={nextStep} disabled={dataNasc.length < 10} />
+      </SafeAreaView>
+    </TouchableWithoutFeedback>
   );
 
   // Step 2 — Sexo
@@ -306,6 +312,8 @@ export default function OnboardingFilho() {
           value={alergias}
           onChangeText={setAlergias}
           multiline
+          returnKeyType="done"
+          blurOnSubmit={true}
         />
       </View>
       <ArrowButton onPress={nextStep} />

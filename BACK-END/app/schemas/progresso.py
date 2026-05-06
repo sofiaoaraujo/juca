@@ -70,6 +70,13 @@ class RecusarPayload(BaseModel):
     alimento_id: UUID
 
 
+class FotoConquistaPayload(BaseModel):
+    """Payload para salvar a URL da foto de conquista na etapa Comer."""
+    crianca_id: UUID
+    alimento_id: UUID
+    foto_url: str
+
+
 class ProgressoUpdate(BaseModel):
     """
     Payload para atualizar a etapa de um progresso já existente.

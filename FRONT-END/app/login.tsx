@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Dimensions,
   Image,
@@ -54,6 +54,7 @@ export default function Login() {
   const [senhaVisivel, setSenhaVisivel] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
+  const senhaRef = useRef<any>(null);
 
   const handleLogin = async () => {
     setCarregando(true);
@@ -127,6 +128,9 @@ export default function Login() {
               onChangeText={t => { setEmail(t); setErro(''); }}
               keyboardType="email-address"
               autoCapitalize="none"
+              returnKeyType="next"
+              onSubmitEditing={() => senhaRef.current?.focus()}
+              blurOnSubmit={false}
             />
           </View>
 
@@ -134,12 +138,14 @@ export default function Login() {
           <View style={styles.inputBox}>
             <MaterialCommunityIcons name="lock-outline" size={20} color="#5e5c54" style={{ marginRight: 12 }} />
             <TextInput
+              ref={senhaRef}
               style={styles.input}
               placeholder="••••••••"
               placeholderTextColor="rgba(94,92,84,0.4)"
               value={senha}
               onChangeText={t => { setSenha(t); setErro(''); }}
               secureTextEntry={!senhaVisivel}
+              returnKeyType="done"
             />
             <TouchableOpacity activeOpacity={0.7} onPress={() => setSenhaVisivel(!senhaVisivel)}>
               <MaterialCommunityIcons
