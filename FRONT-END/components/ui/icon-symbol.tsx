@@ -21,6 +21,7 @@ const MAPPING = {
   'chart.bar.fill': 'bar-chart',
   'gearshape.fill': 'settings',
   'photo.stack.fill': 'photo-library',
+  'message.fill': 'chat',
 } as IconMapping;
 
 /**

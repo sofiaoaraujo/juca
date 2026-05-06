@@ -571,7 +571,7 @@ export default function Relatorio() {
             color="#fff"
           />
           <Text style={styles.pdfBtnText}>
-            {gerandoPDF ? 'Gerando PDF...' : 'Exportar PDF para Terapeuta'}
+            {gerandoPDF ? 'Gerando...' : 'Exportar'}
           </Text>
         </TouchableOpacity>
         <Text style={styles.footerNota}>Compartilha por WhatsApp, e-mail ou salva no celular</Text>

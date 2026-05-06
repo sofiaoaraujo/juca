@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? 'http://ipv4:8000';
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? 'http://192.168.1.8:8000';
 const CACHE_HORAS = 6;
 
 export type SugestaoAlimento = {
@@ -45,7 +45,7 @@ export async function obterSugestoesFoodChaining(criancaId: string, forceRefresh
   try {
     const response = await fetch(`${BACKEND_URL}/ia/sugestao-food-chaining/${criancaId}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
     });
 
     if (!response.ok) {
@@ -77,7 +77,7 @@ export async function gerarAnaliseRelatorio(criancaId: string, force = false): P
     const url = `${BACKEND_URL}/ia/analise-relatorio/${criancaId}${force ? '?force=true' : ''}`;
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
     });
 
     if (!response.ok) {

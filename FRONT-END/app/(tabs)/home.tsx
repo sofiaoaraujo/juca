@@ -803,7 +803,7 @@ const styles = StyleSheet.create({
   logo: { width: 52, height: 52, borderRadius: 14 },
   headerTexto: { flex: 1 },
   greeting: { fontSize: 12, color: '#5e5c54', fontWeight: '500', marginBottom: 2 },
-  titulo: { fontSize: 20, fontWeight: '800', color: '#1b1c16', letterSpacing: -0.5 },
+  titulo: { fontSize: 26, fontWeight: '800', color: '#1b1c16', letterSpacing: -0.5 },
   seletorBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#ffdbc9', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 100, maxWidth: 110 },
   seletorNome: { fontSize: 12, color: '#904c1f', fontWeight: '700', flex: 1 },
   subtitulo: { fontSize: 16, color: '#904c1f', lineHeight: 24, marginBottom: 16 },
