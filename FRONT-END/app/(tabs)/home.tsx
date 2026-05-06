@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -130,7 +131,6 @@ function TrilhaSOS({
   onEtapaConcluida,
   onSalvar,
   onRecusar,
-  salvando,
   nomeFilho,
   alimentoNome,
   confettiRef,
@@ -139,7 +139,6 @@ function TrilhaSOS({
   onEtapaConcluida: (id: string, foto?: string) => void;
   onSalvar: () => void;
   onRecusar: () => void;
-  salvando: boolean;
   nomeFilho: string;
   alimentoNome: string;
   confettiRef: React.RefObject<any>;
@@ -473,8 +472,6 @@ export default function Home() {
   const [trilhaVisivel, setTrilhaVisivel] = useState(false);
   const [etapasConcluidas, setEtapasConcluidas] = useState<string[]>([]);
   const [etapasAnteriores, setEtapasAnteriores] = useState<string[]>([]);
-  const [fotosSessao, setFotosSessao] = useState<string[]>([]);
-  const [salvando, setSalvando] = useState(false);
   const confettiHomeRef = useRef<any>(null);
 
   useEffect(() => {
@@ -491,7 +488,6 @@ export default function Home() {
   const abrirTrilha = async (alimento: AlimentoSugerido) => {
     setAlimentoAtivo(alimento);
     setEtapasConcluidas([]);
-    setFotosSessao([]);
 
     // Busca etapas antes de abrir o modal para evitar flash de trilha vazia.
     // Só então abre o modal com o progresso já restaurado.
@@ -507,7 +503,6 @@ export default function Home() {
     setTrilhaVisivel(false);
     setAlimentoAtivo(null);
     setEtapasConcluidas([]);
-    setFotosSessao([]);
     setEtapasAnteriores([]);
   };
 
@@ -515,7 +510,6 @@ export default function Home() {
   // Para a etapa "comer" com foto, encadeia o upload após o insert da row.
   const onEtapaConcluida = (id: string, foto?: string) => {
     setEtapasConcluidas(prev => [...prev, id]);
-    if (foto) setFotosSessao(prev => [...prev, foto]);
     if (!filhoAtivo?.id || !alimentoAtivo?.id) return;
 
     const criancaId = filhoAtivo.id;
@@ -547,9 +541,17 @@ export default function Home() {
         console.error('Erro ao registrar recusa:', e)
       );
       const idRecusado = alimentoAtivo.id;
-      setSugestoes(prev => prev.map(s =>
+      const novas = sugestoes.map(s =>
         s.id === idRecusado ? { ...s, status: 'Recusado' } : s
-      ));
+      );
+      setSugestoes(novas);
+
+      const cacheKey = `@juca:sugestoes:${filhoAtivo.id}`;
+      const cached = await AsyncStorage.getItem(cacheKey);
+      if (cached) {
+        const { timestamp } = JSON.parse(cached);
+        await AsyncStorage.setItem(cacheKey, JSON.stringify({ data: novas, timestamp }));
+      }
     }
     fecharTrilha();
   };
@@ -725,7 +727,6 @@ export default function Home() {
               onEtapaConcluida={onEtapaConcluida}
               onSalvar={salvarSessao}
               onRecusar={onRecusarAlimento}
-              salvando={salvando}
               nomeFilho={filhoAtivo?.nome ?? 'seu pequeno'}
               alimentoNome={alimentoAtivo?.nome ?? 'o alimento'}
               confettiRef={confettiHomeRef}
