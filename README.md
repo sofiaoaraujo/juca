@@ -1,52 +1,102 @@
-# Welcome to your Expo app 👋
+# JUCA
+## Aplicativo de introdução alimentar voltado para pais de crianças que enfrentam a seletividade alimentar
+<img src="./FRONT-END/assets/images/logo.png" width="200" />
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+App concorrente ao hackathon do Trilha
 
-## Get started
+## Índice
+- <a href="#contexto">Contexto Geral</a>
+- <a href="#fucionalidades">Funcionalidades</a>
+- <a href="#demonstracao">Demonstração</a>
+- <a href="#rodar">Como rodar esse projeto?</a>
+- <a href="#tecnologias">Tecnologias Utilizadas</a>
+- <a href="#autoras">Equipe autoral</a>
+- <a href="#passos">Próximos passos</a>
 
-1. Install dependencies
+## Contexto Geral
 
-   ```bash
-   npm install
-   ```
+O Juca enfrenta a seletividade alimentar que acomete 80% das crianças atípicas a partir dos métodos:
 
-2. Start the app
+ - Food Chaining: A IA sugere alimentos similares ao já consumidos pela criança em termos de cor, textura e formato
+ - SOS: O aplicativo cria uma trilha sensorial para cada alimentos sugerido, do tolerar ao comer, onde acompanha o progresso do usuáriio
+ - ABA: Os progressos são revertidos em parabéns, reforços postivos e o responsável da criança registra com fotos dos alimentos
+ - Acompanhento Terapêutico: O aplicativo gera o relatório do progresso da criança em pdf para ser mandado no WhatsApp e acompanhado pelo terapeuta
 
-   ```bash
-   npx expo start
-   ```
+## Funcionalidades
 
-In the output, you'll find options to open the app in a
+ - [x] Login  
+ - [x] Cadastro do usuário  
+ - [x] Questionário inicial  
+ - [x] Sugestão de comidas  
+ - [x] Trilha sensorial
+ - [x] Progresso e relatório terapêutico   
+ - [x] Configurações para adicionar e gerir contas das crianças
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Demonstração
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Como rodar esse projeto?
 
-## Get a fresh project
+### Pré-requisitos
+- Node.js
+- Python 3.12
+- Expo Go instalado no celular
 
-When you're ready, run:
-
+### Clone o repositório
 ```bash
-npm run reset-project
+git clone https://github.com/sofiaoaraujo/juca.git
+cd juca
+### Variáveis de ambiente (Back-end)
+
+Após copiar o `.env.example` para `.env`, preencha as seguintes chaves:
+
+| Variável | Como obter |
+|---|---|
+| `SUPABASE_URL` | [supabase.com](https://supabase.com) → Configurações do Projeto → API |
+| `SUPABASE_ANON_KEY` | [supabase.com](https://supabase.com) → Configurações do Projeto→ API |
+| `SUPABASE_SERVICE_KEY` | [supabase.com](https://supabase.com) → Configurações do Projeto → API |
+| `GEMINI_API_KEY` | [aistudio.google.com](https://aistudio.google.com) → Tenha chave API|
+
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### Back-end
+```bash
+cd BACK-END
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env  # preencha com suas chaves
+uvicorn app.main:app --reload --host 0.0.0.0
+```
 
-## Learn more
+### Front-end
+```bash
+cd FRONT-END
+npm install
+# no arquivo .env, coloque o IP do seu computador em EXPO_PUBLIC_BACKEND_URL
+npx expo start --lan
+```
+## Tecnologias Utilizadas
 
-To learn more about developing your project with Expo, look at the following resources:
+### Back-end
+1. [Python](https://www.python.org/) com [FastAPI](https://fastapi.tiangolo.com/)
+2. [Supabase](https://supabase.com/) — banco de dados PostgreSQL
+3. [Google Gemini](https://deepmind.google/technologies/gemini/) — inteligência artificial para sugestões alimentares
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### Front-end
+1. [React Native](https://reactnative.dev/) com [Expo](https://expo.dev/)
+2. [TypeScript](https://www.typescriptlang.org/) — linguagem tipada
+3. [Expo Router](https://expo.github.io/router/) — navegação
 
-## Join the community
+## Equipe Autoral
 
-Join our community of developers creating universal apps.
+| Nome | GitHub | Linkedln
+|---|---|---|
+| Sofia Oliveira Araújo | [@sofiaoaraujo](https://github.com/sofiaoaraujo) |  [Sofia Araújo](https://www.linkedin.com/in/sofia-araújo-439178294?utm_source=share_via&utm_content=profile&utm_medium=member_android)            |           
+| Mikael Rodrigues dos Santos| [@MikaelRodriguess](https://github.com/MikaelRodriguess) | [Mikael Rodrigues](https://www.linkedin.com/in/mikael-rodrigues-690b48373?utm_source=share_via&utm_content=profile&utm_medium=member_android) |
+| Pierre Queiroz C. Pereira| [@pierrequeiroz2006](https://github.com/pierrequeiroz2006)| [Pierre Queiroz](https://www.linkedin.com/in/pierrequeiroz?utm_source=share_via&utm_content=profile&utm_medium=member_android) |
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
 
+## Próximos Passos
 
+ - { } Geração de receitas com os alimentos seguros e de introdução
+ - { } Atividades lúdicas para familiarizar a criança com os alimentos
