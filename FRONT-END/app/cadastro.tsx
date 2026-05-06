@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Dimensions,
   KeyboardAvoidingView,
@@ -25,6 +25,8 @@ export default function Cadastro() {
   const [senhaVisivel, setSenhaVisivel] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
+  const emailRef = useRef<any>(null);
+  const senhaRef = useRef<any>(null);
 
   const podeCadastrar = nome.trim() && email.trim() && senha.length >= 6;
 
@@ -104,12 +106,16 @@ export default function Cadastro() {
               value={nome}
               onChangeText={t => { setNome(t); setErro(''); }}
               autoCapitalize="words"
+              returnKeyType="next"
+              onSubmitEditing={() => emailRef.current?.focus()}
+              blurOnSubmit={false}
             />
           </View>
 
           <Text style={styles.inputLabel}>E-MAIL</Text>
           <View style={styles.inputBox}>
             <TextInput
+              ref={emailRef}
               style={styles.input}
               placeholder="seu@email.com"
               placeholderTextColor="rgba(94,92,84,0.5)"
@@ -117,18 +123,24 @@ export default function Cadastro() {
               onChangeText={t => { setEmail(t); setErro(''); }}
               keyboardType="email-address"
               autoCapitalize="none"
+              returnKeyType="next"
+              onSubmitEditing={() => senhaRef.current?.focus()}
+              blurOnSubmit={false}
             />
           </View>
 
           <Text style={styles.inputLabel}>SENHA</Text>
           <View style={styles.inputBox}>
             <TextInput
+              ref={senhaRef}
               style={styles.input}
               placeholder="••••••••"
               placeholderTextColor="rgba(94,92,84,0.5)"
               value={senha}
               onChangeText={t => { setSenha(t); setErro(''); }}
               secureTextEntry={!senhaVisivel}
+              returnKeyType="go"
+              onSubmitEditing={() => { if (podeCadastrar) handleCadastro(); }}
             />
             <TouchableOpacity activeOpacity={0.7} onPress={() => setSenhaVisivel(!senhaVisivel)}>
               <MaterialCommunityIcons

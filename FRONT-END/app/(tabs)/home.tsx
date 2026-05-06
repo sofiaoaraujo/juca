@@ -19,7 +19,7 @@ import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../../context/FilhosContext';
 import { obterSugestoesFoodChaining, type SugestaoAlimento } from '../../services/gemini';
-import { salvarEtapaSOS, buscarEtapasSalvas, recusarAlimento } from '../../services/progresso';
+import { salvarEtapaSOS, buscarEtapasSalvas, recusarAlimento, uploadFotoConquista } from '../../services/progresso';
 import { resolverImagem } from '../../utils/alimentos';
 import { supabase } from '../../services/supabase';
 
@@ -147,6 +147,8 @@ function TrilhaSOS({
   const [etapaAberta, setEtapaAberta] = useState<SOSEtapa | null>(null);
   const [celebrandoVisivel, setCelebrandoVisivel] = useState(false);
   const [fotoCapturada, setFotoCapturada] = useState<string | null>(null);
+  const [recusarConfirmVisivel, setRecusarConfirmVisivel] = useState(false);
+  const [recusaPendente, setRecusaPendente] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -263,7 +265,7 @@ function TrilhaSOS({
             <TouchableOpacity
               activeOpacity={estado === 'bloqueada' ? 1 : 0.8}
               onPress={() => {
-                if (estado === 'bloqueada') return;
+                if (estado === 'bloqueada' || recusaPendente) return;
                 if (etapa.ehFinal && !etapasConcluidas.includes(etapa.id)) {
                   setCelebrandoVisivel(true);
                 } else {
@@ -302,7 +304,7 @@ function TrilhaSOS({
         <TouchableOpacity
           activeOpacity={0.85}
           style={trilhaStyles.recusarBtn}
-          onPress={onRecusar}
+          onPress={() => setRecusarConfirmVisivel(true)}
         >
           <MaterialCommunityIcons name="close-circle-outline" size={18} color="#904c1f" />
           <Text style={trilhaStyles.recusarText}>Alimento Recusado</Text>
@@ -399,6 +401,44 @@ function TrilhaSOS({
           </View>
         </View>
       </Modal>
+
+      {/* Modal de confirmação de recusa */}
+      <Modal visible={recusarConfirmVisivel} animationType="fade" transparent onRequestClose={() => setRecusarConfirmVisivel(false)}>
+        <View style={trilhaStyles.overlay}>
+          <View style={[trilhaStyles.modalCard, { paddingTop: 28 }]}>
+            <View style={trilhaStyles.recusarConfirmIcone}>
+              <MaterialCommunityIcons name="heart-outline" size={36} color="#b22300" />
+            </View>
+            <Text style={trilhaStyles.recusarConfirmTitulo}>Não desista ainda! 💛</Text>
+            <Text style={trilhaStyles.recusarConfirmMsg}>
+              Sabemos que introduzir um novo alimento pode ser cansativo e desafiador. Cada tentativa conta, mesmo as que parecem pequenas. Tente mais uma vez — estamos torcendo por vocês!
+            </Text>
+            <View style={trilhaStyles.recusarConfirmDica}>
+              <MaterialCommunityIcons name="lightbulb-outline" size={18} color="#904c1f" />
+              <Text style={trilhaStyles.recusarConfirmDicaTexto}>
+                Estudos mostram que uma criança pode precisar de 15 a 20 exposições a um alimento antes de aceitá-lo. Cada contato é um passo!
+              </Text>
+            </View>
+            <View style={trilhaStyles.recusarConfirmBtns}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={trilhaStyles.recusarConfirmCancelarBtn}
+                onPress={() => setRecusarConfirmVisivel(false)}
+              >
+                <MaterialCommunityIcons name="arrow-left" size={18} color="#b22300" />
+                <Text style={trilhaStyles.recusarConfirmCancelarText}>Vou tentar mais</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={trilhaStyles.recusarConfirmOkBtn}
+                onPress={() => { setRecusaPendente(true); setRecusarConfirmVisivel(false); setTimeout(() => onRecusar(), 350); }}
+              >
+                <Text style={trilhaStyles.recusarConfirmOkText}>Confirmar recusa</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -471,16 +511,23 @@ export default function Home() {
     setEtapasAnteriores([]);
   };
 
-  // Auto-save: persiste cada etapa imediatamente ao ser concluída
+  // Auto-save: persiste cada etapa imediatamente ao ser concluída.
+  // Para a etapa "comer" com foto, encadeia o upload após o insert da row.
   const onEtapaConcluida = (id: string, foto?: string) => {
     setEtapasConcluidas(prev => [...prev, id]);
     if (foto) setFotosSessao(prev => [...prev, foto]);
-    // Salva no banco em background (fire-and-forget com log de erro)
-    if (filhoAtivo?.id && alimentoAtivo?.id) {
-      salvarEtapaSOS(filhoAtivo.id, alimentoAtivo.id, id).catch(e =>
-        console.error('Erro ao auto-salvar etapa:', e)
-      );
-    }
+    if (!filhoAtivo?.id || !alimentoAtivo?.id) return;
+
+    const criancaId = filhoAtivo.id;
+    const alimentoId = alimentoAtivo.id;
+
+    const pipeline = async () => {
+      await salvarEtapaSOS(criancaId, alimentoId, id);
+      if (id === 'comer' && foto) {
+        await uploadFotoConquista(foto, criancaId, alimentoId);
+      }
+    };
+    pipeline().catch(e => console.error('Erro ao salvar etapa:', e));
   };
 
   // Salvar sessão: fecha a trilha e marca localmente como 'Comer' se concluída
@@ -544,28 +591,47 @@ export default function Home() {
           <CajuLoading />
         ) : sugestoes.length > 0 ? (
           <View style={styles.cardsRow}>
-            {sugestoes.map((alimento) => (
-              <TouchableOpacity key={alimento.id} activeOpacity={0.75} style={[styles.foodCard, { backgroundColor: alimento.corFundo }]} onPress={() => abrirTrilha(alimento)}>
+            {sugestoes.map((alimento) => {
+              const foiRecusado = alimento.status === 'Recusado';
+              return (
+              <TouchableOpacity
+                key={alimento.id}
+                activeOpacity={foiRecusado ? 1 : 0.75}
+                style={[styles.foodCard, { backgroundColor: alimento.corFundo }, foiRecusado && styles.foodCardRecusado]}
+                onPress={() => { if (!foiRecusado) abrirTrilha(alimento); }}
+              >
                 <View style={styles.cardHeader}>
-                  <Text style={styles.cardCategoria} numberOfLines={1}>{(alimento.categoria ?? 'Alimento').toUpperCase()}</Text>
-                  {alimento.status && (
+                  <Text style={[styles.cardCategoria, foiRecusado && { color: '#a89f91' }]} numberOfLines={1}>{(alimento.categoria ?? 'Alimento').toUpperCase()}</Text>
+                  {foiRecusado ? (
+                    <View style={styles.badgeRecusado}>
+                      <MaterialCommunityIcons name="close-circle-outline" size={10} color="#999" />
+                      <Text style={styles.badgeRecusadoText}>Recusado</Text>
+                    </View>
+                  ) : alimento.status ? (
                     <View style={styles.badgeAndamento}>
                       <MaterialCommunityIcons name="clock-outline" size={10} color="#b22300" />
                       <Text style={styles.badgeAndamentoText}>Em andamento</Text>
                     </View>
-                  )}
+                  ) : null}
                 </View>
-                <View style={[styles.iconeCircle, { backgroundColor: alimento.corIcone }]}>
+                <View style={[styles.iconeCircle, { backgroundColor: alimento.corIcone }, foiRecusado && { opacity: 0.4 }]}>
                   <Image source={resolverImagem(alimento.nome, alimento.categoria ?? undefined)} style={styles.cardImagem} resizeMode="contain" />
                 </View>
-                <Text style={styles.cardNome}>{alimento.nome}</Text>
-                <Text style={styles.cardMotivo}>{alimento.motivo}</Text>
-                <View style={styles.cardBotao}>
-                  <Text style={styles.cardBotaoText}>{alimento.status ? 'Retomar Trilha' : 'Iniciar Trilha'}</Text>
-                  <MaterialCommunityIcons name="arrow-right" size={13} color="#b22300" />
-                </View>
+                <Text style={[styles.cardNome, foiRecusado && { color: '#a89f91' }]}>{alimento.nome}</Text>
+                <Text style={[styles.cardMotivo, foiRecusado && { color: '#c4c2b8' }]}>{alimento.motivo}</Text>
+                {foiRecusado ? (
+                  <View style={styles.cardBotaoRecusado}>
+                    <Text style={styles.cardBotaoRecusadoText}>Alimento recusado</Text>
+                  </View>
+                ) : (
+                  <View style={styles.cardBotao}>
+                    <Text style={styles.cardBotaoText}>{alimento.status ? 'Retomar Trilha' : 'Iniciar Trilha'}</Text>
+                    <MaterialCommunityIcons name="arrow-right" size={13} color="#b22300" />
+                  </View>
+                )}
               </TouchableOpacity>
-            ))}
+              );
+            })}
           </View>
         ) : (
           <TouchableOpacity activeOpacity={0.8} style={styles.recarregarBox} onPress={() => carregarSugestoes()}>
@@ -715,6 +781,18 @@ const trilhaStyles = StyleSheet.create({
   fotoPreviewWrap: { width: '100%', marginBottom: 20, borderRadius: 16, overflow: 'hidden', position: 'relative' },
   fotoPreview: { width: '100%', height: 180, borderRadius: 16 },
   trocarFotoBtn: { position: 'absolute', top: 8, right: 8, backgroundColor: '#fff', borderRadius: 12 },
+
+  // Confirmação de recusa
+  recusarConfirmIcone: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#fff5f3', borderWidth: 2, borderColor: '#b22300', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  recusarConfirmTitulo: { fontSize: 22, fontWeight: '800', color: '#1b1c16', textAlign: 'center', marginBottom: 10 },
+  recusarConfirmMsg: { fontSize: 15, color: '#5e5c54', textAlign: 'center', lineHeight: 23, marginBottom: 18, paddingHorizontal: 4 },
+  recusarConfirmDica: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#ffdbc9', borderRadius: 16, padding: 14, marginBottom: 24, width: '100%' },
+  recusarConfirmDicaTexto: { flex: 1, fontSize: 13, color: '#904c1f', lineHeight: 20 },
+  recusarConfirmBtns: { flexDirection: 'row', gap: 10, width: '100%' },
+  recusarConfirmCancelarBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 16, borderRadius: 100, backgroundColor: '#fff5f3', borderWidth: 1.5, borderColor: 'rgba(178,35,0,0.2)' },
+  recusarConfirmCancelarText: { color: '#b22300', fontSize: 14, fontWeight: '700' },
+  recusarConfirmOkBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 100, backgroundColor: 'rgba(144,76,31,0.1)', borderWidth: 1.5, borderColor: 'rgba(144,76,31,0.25)' },
+  recusarConfirmOkText: { color: '#904c1f', fontSize: 14, fontWeight: '700' },
 });
 
 // ─── Styles principais ────────────────────────────────────────────────────────
@@ -749,6 +827,11 @@ const styles = StyleSheet.create({
   cardMotivo: { fontSize: 11, color: '#5e5c54', textAlign: 'center', lineHeight: 15, marginBottom: 14 },
   cardBotao: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(178,35,0,0.08)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 100, alignSelf: 'center' },
   cardBotaoText: { fontSize: 12, color: '#b22300', fontWeight: '700' },
+  foodCardRecusado: { opacity: 0.55 },
+  badgeRecusado: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.06)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 100, flexShrink: 0, marginLeft: 4 },
+  badgeRecusadoText: { fontSize: 9, fontWeight: '700', color: '#999', letterSpacing: 0 },
+  cardBotaoRecusado: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.05)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 100, alignSelf: 'center' },
+  cardBotaoRecusadoText: { fontSize: 12, color: '#a89f91', fontWeight: '700' },
   overlay: { flex: 1, backgroundColor: 'rgba(27,28,22,0.4)', justifyContent: 'flex-start', alignItems: 'flex-end', paddingTop: 100, paddingRight: 24 },
   seletorModal: { backgroundColor: '#fff', borderRadius: 24, padding: 20, width: 240, shadowColor: '#4b4944', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.12, shadowRadius: 32, elevation: 10 },
   seletorTitulo: { fontSize: 10, fontWeight: '700', color: '#904c1f', letterSpacing: 1.5, marginBottom: 14 },

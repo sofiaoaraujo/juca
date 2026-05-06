@@ -261,6 +261,8 @@ export default function Configuracoes() {
                 value={alergias}
                 onChangeText={setAlergias}
                 multiline
+                returnKeyType="done"
+                blurOnSubmit={true}
               />
             </View>
 
@@ -274,6 +276,8 @@ export default function Configuracoes() {
                 value={neuro}
                 onChangeText={setNeuro}
                 multiline
+                returnKeyType="done"
+                blurOnSubmit={true}
               />
             </View>
           </ScrollView>
@@ -318,6 +322,7 @@ export default function Configuracoes() {
                 value={confirmandoNome}
                 onChangeText={setConfirmandoNome}
                 autoFocus
+                returnKeyType="done"
               />
             </View>
             <View style={styles.excluirBotoes}>
@@ -335,6 +340,7 @@ export default function Configuracoes() {
                   confirmandoNome.trim().toLowerCase() !== filhoExcluindo?.nome.trim().toLowerCase() && styles.excluirBtnOff,
                 ]}
                 onPress={confirmarExclusao}
+                disabled={confirmandoNome.trim().toLowerCase() !== filhoExcluindo?.nome.trim().toLowerCase()}
               >
                 <Text style={styles.excluirBtnText}>Excluir</Text>
               </TouchableOpacity>
