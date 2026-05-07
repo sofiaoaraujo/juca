@@ -25,14 +25,20 @@ export async function buscarFilhosDoSupabase(userId: string): Promise<Filho[]> {
     .eq('cuidador_id', userId);
 
   return Promise.all((criancas ?? []).map(async (c: any) => {
-    const { data: progressos } = await supabase
-      .from('crianca_alimento')
-      .select('alimentos(nome)')
-      .eq('crianca_id', c.id);
+    const [progressoRes, alergiasRes, neurosRes] = await Promise.all([
+      supabase.from('crianca_alimento').select('alimentos(nome)').eq('crianca_id', c.id),
+      supabase.from('crianca_alergia').select('alergia_id').eq('crianca_id', c.id),
+      supabase.from('crianca_neurodivergencia').select('neurodivergencias(neurodivergencia)').eq('crianca_id', c.id),
+    ]);
 
     const alimentosSelecionados = [...new Set(
-      (progressos ?? []).map((p: any) => p.alimentos?.nome).filter(Boolean)
+      (progressoRes.data ?? []).map((p: any) => p.alimentos?.nome).filter(Boolean)
     )] as string[];
+
+    const alergiasIds = (alergiasRes.data ?? []).map((r: any) => r.alergia_id).filter(Boolean);
+    const alergiaDetalhesRes = alergiasIds.length > 0
+      ? await supabase.from('alergias').select('nome').in('id', alergiasIds)
+      : { data: [] };
 
     return {
       id: c.id,
@@ -41,8 +47,8 @@ export async function buscarFilhosDoSupabase(userId: string): Promise<Filho[]> {
         ? c.data_nascimento.split('-').reverse().join('/')
         : '',
       sexo: c.sexo ?? '',
-      alergias: '',
-      neuro: '',
+      alergias: (alergiaDetalhesRes.data ?? []).map((a: any) => a.nome).filter(Boolean).join(', '),
+      neuro: (neurosRes.data ?? []).map((n: any) => n.neurodivergencias?.neurodivergencia).filter(Boolean).join(', '),
       alimentosSelecionados,
       criadoEm: c.data_nascimento ?? new Date().toISOString(),
     };
@@ -73,31 +79,26 @@ export function FilhosProvider({ children }: { children: React.ReactNode }) {
 
   const recarregar = useCallback(async () => {
     try {
-      // TESTE: cache desabilitado temporariamente
-      // const v = await AsyncStorage.getItem(STORAGE_KEY);
-      // let lista: Filho[] = v ? JSON.parse(v) : [];
-      let lista: Filho[] = [];
+      const v = await AsyncStorage.getItem(STORAGE_KEY);
+      let lista: Filho[] = v ? JSON.parse(v) : [];
 
-      // Fallback: se o cache local está vazio mas há sessão autenticada,
-      // busca os filhos diretamente do Supabase e persiste localmente.
-      if (lista.length === 0) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user?.id) {
-          try {
-            lista = await buscarFilhosDoSupabase(session.user.id);
-            if (lista.length > 0) {
-              await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(lista));
-            }
-          } catch (e) {
-            console.error('Erro ao buscar filhos do Supabase (fallback):', e);
-          }
-        }
+      if (lista.length > 0) {
+        setFilhos(lista);
+        const ativoId = await AsyncStorage.getItem(ATIVO_KEY);
+        setFilhoAtivoState(lista.find(f => f.id === ativoId) ?? lista[0] ?? null);
+        setCarregando(false);
       }
 
-      setFilhos(lista);
-      const ativoId = await AsyncStorage.getItem(ATIVO_KEY);
-      const ativo = lista.find(f => f.id === ativoId) ?? lista[0] ?? null;
-      setFilhoAtivoState(ativo);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id) {
+        lista = await buscarFilhosDoSupabase(session.user.id);
+        if (lista.length > 0) {
+          setFilhos(lista);
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(lista));
+          const ativoId = await AsyncStorage.getItem(ATIVO_KEY);
+          setFilhoAtivoState(lista.find(f => f.id === ativoId) ?? lista[0] ?? null);
+        }
+      }
     } catch (e) {
       console.error('Erro ao carregar filhos:', e);
     } finally {
