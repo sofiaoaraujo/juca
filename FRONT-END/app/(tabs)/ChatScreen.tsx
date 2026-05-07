@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
+import { useFilhos } from "../../context/FilhosContext";
+import { supabase } from "../../services/supabase";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -23,20 +25,9 @@ interface Message {
   content: string;
 }
 
-interface FoodProgress {
-  name: string;
-  sosStep: "cheirar" | "tocar" | "beijar" | "provar" | "comer";
-}
-
-interface ChildProfile {
-  name: string;
-  age: number; // meses
-  foods: FoodProgress[];
-}
-
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
-const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? "http://ipv4:8000";
+const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? "http://192.168.1.12:8000";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 // Paleta — creme/off-white do Stitch + navy bold + terracota como acento
@@ -49,19 +40,6 @@ const C = {
   inputBorder: "#DDD5C4",
   placeholder: "#A89880",
   muted:       "#8A7A6A",
-};
-
-// ─── Mock — substituir pelo contexto real do app ──────────────────────────────
-
-const MOCK_CHILD: ChildProfile = {
-  name: "Miguel",
-  age: 18,
-  foods: [
-    { name: "Banana",   sosStep: "provar"  },
-    { name: "Cenoura",  sosStep: "tocar"   },
-    { name: "Brócolis", sosStep: "cheirar" },
-    { name: "Maçã",     sosStep: "comer"   },
-  ],
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -115,11 +93,9 @@ const SUGGESTIONS = [
 
 // ─── Tela ─────────────────────────────────────────────────────────────────────
 
-interface Props {
-  childProfile?: ChildProfile;
-}
+export default function ChatScreen() {
+  const { filhoAtivo } = useFilhos();
 
-export default function ChatScreen({ childProfile = MOCK_CHILD }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [timestamps, setTs]     = useState<Date[]>([]);
   const [input, setInput]       = useState("");
@@ -127,14 +103,15 @@ export default function ChatScreen({ childProfile = MOCK_CHILD }: Props) {
   const [showChips, setShowChips] = useState(true);
   const scrollRef = useRef<ScrollView>(null);
 
-  // Mensagem de boas-vindas
+  // Mensagem de boas-vindas — atualiza quando o filho ativo muda
   useEffect(() => {
-    setMessages([{
-      role: "assistant",
-      content: `Olá! Sou o Assistente Juca.\n\nAcompanho o progresso do ${childProfile.name} e estou aqui para tirar suas dúvidas sobre o Método SOS, ABA e Food Chaining — e como tornar cada refeição mais agradável.\n\nComo posso ajudar?`,
-    }]);
+    const nomeFilho = filhoAtivo?.nome;
+    const saudacao = nomeFilho
+      ? `Olá! Sou o Assistente Juca.\n\nAcompanho o progresso do ${nomeFilho} e estou aqui para tirar suas dúvidas sobre o Método SOS, ABA e Food Chaining — e como tornar cada refeição mais agradável.\n\nComo posso ajudar?`
+      : `Olá! Sou o Assistente Juca.\n\nEstou aqui para tirar suas dúvidas sobre o Método SOS, ABA e Food Chaining — e como tornar cada refeição mais agradável.\n\nComo posso ajudar?`;
+    setMessages([{ role: "assistant", content: saudacao }]);
     setTs([new Date()]);
-  }, [childProfile.name]);
+  }, [filhoAtivo?.nome]);
 
   const scrollToBottom = () =>
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
@@ -154,10 +131,24 @@ export default function ChatScreen({ childProfile = MOCK_CHILD }: Props) {
     scrollToBottom();
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
+      };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
       const res = await fetch(`${API_URL}/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
-        body: JSON.stringify({ messages: nextMsgs, child_profile: childProfile }),
+        headers,
+        body: JSON.stringify({
+          messages: nextMsgs,
+          user_id:  session?.user?.id  ?? null,
+          child_id: filhoAtivo?.id     ?? null,
+        }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
