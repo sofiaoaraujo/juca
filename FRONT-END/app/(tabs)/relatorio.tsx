@@ -175,6 +175,7 @@ export default function Relatorio() {
         )
       : null;
   const conquistasCompletas = historicoIA.filter(s => s.etapa_atual === 'Comer');
+  const alimentosRecusados = historicoIA.filter(s => s.etapa_atual === 'Recusado');
   const alimentosUnicos = [...new Set(historicoIA.map(s => s.alimento?.nome ?? ''))];
 
   // ─── Geração do PDF ────────────────────────────────────────────────────────
@@ -230,13 +231,26 @@ export default function Relatorio() {
              </div>`
           : '';
 
+      const recusadosHTML =
+        alimentosRecusados.length > 0
+          ? `<div class="label">ALIMENTOS RECUSADOS</div>
+             <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+               ${alimentosRecusados.map(s =>
+                 `<div style="border-radius:10px;background-color:#f0eee4;padding:10px 14px;">
+                    <strong style="font-size:13px;color:#5e5c54;">${s.alimento?.nome ?? ''}</strong><br/>
+                    <span style="font-size:11px;color:#5e5c54;">${formatarData(s.created_at)}</span>
+                  </div>`
+               ).join('')}
+             </div>`
+          : '';
+
       const sessoesHTML = historicoIA
         .map(s => {
           const pct = calcProgresso(s.etapas_concluidas);
           const eRecusado = s.etapa_atual === 'Recusado';
           const etapasHTML = STATUS_DISPLAY.map(({ key, label }) => {
             const feita = s.etapas_concluidas.includes(key);
-            return `<span style="display:inline-block;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600;margin:2px;background:${feita ? '#b22300' : '#f0eee4'};color:${feita ? '#fff' : '#5e5c54'};">${label}</span>`;
+            return `<span style="display:inline-block;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600;margin:2px;background-color:${feita ? '#b22300' : '#f0eee4'};color:${feita ? '#fff' : '#5e5c54'};">${label}</span>`;
           }).join('') + (eRecusado
             ? `<span style="display:inline-block;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600;margin:2px;background:#5e5c54;color:#fff;">Recusado</span>`
             : '');
@@ -259,6 +273,7 @@ export default function Relatorio() {
 
       const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>
         <style>
+          *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
           body{font-family:-apple-system,sans-serif;background:#fcf9ef;color:#1b1c16;padding:32px;}
           h1{font-size:26px;font-weight:800;margin-bottom:4px;}
           .badge{display:inline-block;background:#ffdbc9;color:#904c1f;padding:4px 12px;border-radius:100px;font-size:12px;font-weight:700;margin-bottom:20px;}
@@ -286,6 +301,7 @@ export default function Relatorio() {
         </div>
         ${analiseHTML}
         ${conquistasHTML}
+        ${recusadosHTML}
         <div class="label">HISTÓRICO DE SESSÃO</div>
         ${sessoesHTML || '<p style="color:#5e5c54;font-size:13px;">Nenhuma sessão registrada ainda.</p>'}
         <div style="border-top:1px solid #e4e3d9;padding-top:14px;margin-top:8px;font-size:12px;color:#5e5c54;">
@@ -375,6 +391,28 @@ export default function Relatorio() {
               <Text style={styles.semDadosTexto}>
                 As conquistas aparecerão aqui quando a criança completar todas as etapas da trilha SOS com um alimento.
               </Text>
+            </View>
+          )}
+        </Secao>
+
+        {/* Alimentos Recusados */}
+        <Secao titulo="Alimentos Recusados" icone="food-off-outline">
+          {alimentosRecusados.length > 0 ? (
+            <View style={styles.conquistasGrid}>
+              {alimentosRecusados.map(s => (
+                <View key={s.alimento_id} style={styles.conquistaCard}>
+                  <View style={[styles.conquistaIcone, { backgroundColor: '#f0eee4' }]}>
+                    <MaterialCommunityIcons name="close-circle-outline" size={28} color="#5e5c54" />
+                  </View>
+                  <Text style={styles.conquistaNome}>{s.alimento?.nome}</Text>
+                  <Text style={styles.conquistaData}>{formatarData(s.created_at)}</Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.semDadosBox}>
+              <MaterialCommunityIcons name="emoticon-happy-outline" size={32} color="#c4c2b8" />
+              <Text style={styles.semDadosTexto}>Nenhum alimento recusado até agora.</Text>
             </View>
           )}
         </Secao>

@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -19,7 +18,7 @@ import ConfettiCannon from 'react-native-confetti-cannon';
 import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../../context/FilhosContext';
-import { obterSugestoesFoodChaining, type SugestaoAlimento } from '../../services/gemini';
+import { obterSugestoesFoodChaining, atualizarStatusNoCacheSugestoes, type SugestaoAlimento } from '../../services/gemini';
 import { salvarEtapaSOS, buscarEtapasSalvas, recusarAlimento, uploadFotoConquista } from '../../services/progresso';
 import { resolverImagem } from '../../utils/alimentos';
 import { supabase } from '../../services/supabase';
@@ -537,21 +536,15 @@ export default function Home() {
 
   const onRecusarAlimento = async () => {
     if (filhoAtivo?.id && alimentoAtivo?.id) {
-      recusarAlimento(filhoAtivo.id, alimentoAtivo.id).catch(e =>
+      const criancaId  = filhoAtivo.id;
+      const alimentoId = alimentoAtivo.id;
+      recusarAlimento(criancaId, alimentoId).catch(e =>
         console.error('Erro ao registrar recusa:', e)
       );
-      const idRecusado = alimentoAtivo.id;
-      const novas = sugestoes.map(s =>
-        s.id === idRecusado ? { ...s, status: 'Recusado' } : s
-      );
-      setSugestoes(novas);
-
-      const cacheKey = `@juca:sugestoes:${filhoAtivo.id}`;
-      const cached = await AsyncStorage.getItem(cacheKey);
-      if (cached) {
-        const { timestamp } = JSON.parse(cached);
-        await AsyncStorage.setItem(cacheKey, JSON.stringify({ data: novas, timestamp }));
-      }
+      setSugestoes(prev => prev.map(s =>
+        s.id === alimentoId ? { ...s, status: 'Recusado' } : s
+      ));
+      atualizarStatusNoCacheSugestoes(criancaId, alimentoId, 'Recusado').catch(() => {});
     }
     fecharTrilha();
   };
