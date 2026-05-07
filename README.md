@@ -2,7 +2,7 @@
 ## Aplicativo de introdução alimentar voltado para pais de crianças que enfrentam a seletividade alimentar
 <img src="./FRONT-END/assets/images/logo.png" width="200" />
 
-App creferente ao hackathon do Trilha 2025.2
+App referente ao hackathon do Trilha 2025.2
 
 ## Índice
 - [Contexto Geral](#contexto-geral)
