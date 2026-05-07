@@ -18,7 +18,7 @@ import ConfettiCannon from 'react-native-confetti-cannon';
 import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../../context/FilhosContext';
-import { obterSugestoesFoodChaining, type SugestaoAlimento } from '../../services/gemini';
+import { obterSugestoesFoodChaining, atualizarStatusNoCacheSugestoes, type SugestaoAlimento } from '../../services/gemini';
 import { salvarEtapaSOS, buscarEtapasSalvas, recusarAlimento, uploadFotoConquista } from '../../services/progresso';
 import { resolverImagem } from '../../utils/alimentos';
 import { supabase } from '../../services/supabase';
@@ -543,13 +543,15 @@ export default function Home() {
 
   const onRecusarAlimento = async () => {
     if (filhoAtivo?.id && alimentoAtivo?.id) {
-      recusarAlimento(filhoAtivo.id, alimentoAtivo.id).catch(e =>
+      const criancaId  = filhoAtivo.id;
+      const alimentoId = alimentoAtivo.id;
+      recusarAlimento(criancaId, alimentoId).catch(e =>
         console.error('Erro ao registrar recusa:', e)
       );
-      const idRecusado = alimentoAtivo.id;
       setSugestoes(prev => prev.map(s =>
-        s.id === idRecusado ? { ...s, status: 'Recusado' } : s
+        s.id === alimentoId ? { ...s, status: 'Recusado' } : s
       ));
+      atualizarStatusNoCacheSugestoes(criancaId, alimentoId, 'Recusado').catch(() => {});
     }
     fecharTrilha();
   };
