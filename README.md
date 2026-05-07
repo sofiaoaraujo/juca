@@ -63,11 +63,12 @@ Após copiar o `.env.example` para `.env`, preencha as seguintes chaves:
 | `APP_ENV=development` |
 | `GEMINI_API_KEY` | [aistudio.google.com](https://aistudio.google.com) → Criar chave API |
 
-| `EXPO_PUBLIC_API_URL` | = http://SEU_IP:8000 |
-| `EXPO_PUBLIC_GEMINI_KEY` | = sua_chave_gemini |
-| `EXPO_PUBLIC_SUPABASE_URL` | = sua_url_do_supabase |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | = sua_chave_anonima |
-
+```
+ `EXPO_PUBLIC_API_URL` = http://SEU_IP:8000
+ `EXPO_PUBLIC_GEMINI_KEY` = sua_chave_gemini
+ `EXPO_PUBLIC_SUPABASE_URL` = sua_url_do_supabase
+ `EXPO_PUBLIC_SUPABASE_ANON_KEY` = sua_chave_anonima
+```
 
 ### Variáveis de ambiente (Front-end)
 
