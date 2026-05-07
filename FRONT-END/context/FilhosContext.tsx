@@ -25,14 +25,25 @@ export async function buscarFilhosDoSupabase(userId: string): Promise<Filho[]> {
     .eq('cuidador_id', userId);
 
   return Promise.all((criancas ?? []).map(async (c: any) => {
-    const { data: progressos } = await supabase
-      .from('crianca_alimento')
-      .select('alimentos(nome)')
-      .eq('crianca_id', c.id);
+    const [progressosRes, alergiasRes, neuroRes] = await Promise.all([
+      supabase.from('crianca_alimento').select('alimentos(nome)').eq('crianca_id', c.id),
+      supabase.from('crianca_alergia').select('alergias(nome)').eq('crianca_id', c.id),
+      supabase.from('crianca_neurodivergencia').select('neurodivergencias(neurodivergencia)').eq('crianca_id', c.id),
+    ]);
 
     const alimentosSelecionados = [...new Set(
-      (progressos ?? []).map((p: any) => p.alimentos?.nome).filter(Boolean)
+      (progressosRes.data ?? []).map((p: any) => p.alimentos?.nome).filter(Boolean)
     )] as string[];
+
+    const alergias = (alergiasRes.data ?? [])
+      .map((a: any) => a.alergias?.nome)
+      .filter(Boolean)
+      .join(', ');
+
+    const neuro = (neuroRes.data ?? [])
+      .map((n: any) => n.neurodivergencias?.neurodivergencia)
+      .filter(Boolean)
+      .join(', ');
 
     return {
       id: c.id,
@@ -41,8 +52,8 @@ export async function buscarFilhosDoSupabase(userId: string): Promise<Filho[]> {
         ? c.data_nascimento.split('-').reverse().join('/')
         : '',
       sexo: c.sexo ?? '',
-      alergias: '',
-      neuro: '',
+      alergias,
+      neuro,
       alimentosSelecionados,
       criadoEm: c.data_nascimento ?? new Date().toISOString(),
     };
