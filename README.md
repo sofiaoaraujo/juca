@@ -18,9 +18,10 @@ App concorrente ao hackathon do Trilha
 O Juca enfrenta a seletividade alimentar que acomete 80% das crianças atípicas a partir dos métodos:
 
  - Food Chaining: A IA sugere alimentos similares ao já consumidos pela criança em termos de cor, textura e formato
- - SOS: O aplicativo cria uma trilha sensorial para cada alimentos sugerido, do tolerar ao comer, onde acompanha o progresso do usuáriio
- - ABA: Os progressos são revertidos em parabéns, reforços postivos e o responsável da criança registra com fotos dos alimentos
- - Acompanhento Terapêutico: O aplicativo gera o relatório do progresso da criança em pdf para ser mandado no WhatsApp e acompanhado pelo terapeuta
+ - SOS: O aplicativo cria uma trilha sensorial para cada alimentos sugerido, do tolerar ao comer, onde acompanha o progresso do usuário
+ - ABA: Os progressos são revertidos em parabéns, reforços positivos e o responsável da criança registra com fotos dos alimentos
+ - Acompanhamento Terapêutico: O aplicativo gera o relatório do progresso da criança em pdf para ser mandado no WhatsApp e acompanhado pelo terapeuta
+ - Assistente Juca: Um chatbot que tira dúvidas dos usuários sobre seletividade alimentar, os métodos do app e o progresso da criança
 
 ## Funcionalidades
 
@@ -29,7 +30,9 @@ O Juca enfrenta a seletividade alimentar que acomete 80% das crianças atípicas
  - [x] Questionário inicial  
  - [x] Sugestão de comidas  
  - [x] Trilha sensorial
- - [x] Progresso e relatório terapêutico   
+ - [x] Progresso e relatório terapêutico  
+ - [x] Galeria fotográfica das conquistas
+ - [x] Chatbot para dúvidas sobre seletividade alimentar
  - [x] Configurações para adicionar e gerir contas das crianças
 
 ## Demonstração
@@ -98,5 +101,6 @@ npx expo start --lan
 
 ## Próximos Passos
 
- - { } Geração de receitas com os alimentos seguros e de introdução
- - { } Atividades lúdicas para familiarizar a criança com os alimentos
+ - [ ] Avatar no jogo que vai se tornando mais forte a partir da alimentação da criança
+ - [ ] Geração de receitas com os alimentos seguros e de introdução
+ - [ ] Atividades lúdicas para familiarizar a criança com os alimentos
