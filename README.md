@@ -2,16 +2,16 @@
 ## Aplicativo de introdução alimentar voltado para pais de crianças que enfrentam a seletividade alimentar
 <img src="./FRONT-END/assets/images/logo.png" width="200" />
 
-App concorrente ao hackathon do Trilha
+App creferente ao hackathon do Trilha 2025.2
 
 ## Índice
-- <a href="#contexto">Contexto Geral</a>
-- <a href="#fucionalidades">Funcionalidades</a>
-- <a href="#demonstracao">Demonstração</a>
-- <a href="#rodar">Como rodar esse projeto?</a>
-- <a href="#tecnologias">Tecnologias Utilizadas</a>
-- <a href="#autoras">Equipe autoral</a>
-- <a href="#passos">Próximos passos</a>
+- [Contexto Geral](#contexto-geral)
+- [Funcionalidades](#funcionalidades)
+- [Demonstração](#demonstração)
+- [Como rodar esse projeto?](#como-rodar-esse-projeto)
+- [Tecnologias Utilizadas](#tecnologias-utilizadas)
+- [Equipe Autoral](#equipe-autoral)
+- [Próximos Passos](#próximos-passos)
 
 ## Contexto Geral
 
