@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { supabase } from '../../services/supabase';
+import api from '../../services/api';
 import {
   Alert,
   Modal,
@@ -55,11 +56,61 @@ export default function Configuracoes() {
     setModalEditar(true);
   };
 
+  const sincronizarAlergias = async (criancaId: string, alergiaTexto: string) => {
+    await supabase.from('crianca_alergia').delete().eq('crianca_id', criancaId);
+    if (!alergiaTexto.trim()) return;
+
+    const respAlergias = await api.get('/alergias/');
+    const alergiasDigitadas = alergiaTexto.split(',').map(a => a.trim()).filter(Boolean);
+
+    for (const texto of alergiasDigitadas) {
+      const encontrada = respAlergias.data.find(
+        (a: any) => a.nome.toLowerCase() === texto.toLowerCase()
+      );
+      let alergiaId = encontrada?.id;
+
+      if (!alergiaId) {
+        const nova = await api.post('/alergias/', { nome: texto });
+        alergiaId = nova.data.id;
+      }
+
+      await api.post('/criancas-alergias/', { crianca_id: criancaId, alergia_id: alergiaId });
+    }
+  };
+
+  const sincronizarNeuro = async (criancaId: string, neuroTexto: string) => {
+    await supabase.from('crianca_neurodivergencia').delete().eq('crianca_id', criancaId);
+    if (!neuroTexto.trim()) return;
+
+    const respNeuro = await api.get('/neurodivergencias/');
+    const neuroDigitadas = neuroTexto.split(',').map(n => n.trim()).filter(Boolean);
+
+    for (const texto of neuroDigitadas) {
+      const encontrada = respNeuro.data.find(
+        (n: any) => n.neurodivergencia.toLowerCase() === texto.toLowerCase()
+      );
+      if (encontrada) {
+        await api.post('/criancas-neurodivergencias/', {
+          crianca_id: criancaId,
+          neurodivergencia_id: encontrada.id,
+        });
+      }
+    }
+  };
+
   const salvarEdicao = async () => {
     if (!filhoEditando) return;
-    await editarFilho(filhoEditando.id, { alergias, neuro });
-    setModalEditar(false);
-    setFilhoEditando(null);
+    try {
+      await Promise.all([
+        sincronizarAlergias(filhoEditando.id, alergias),
+        sincronizarNeuro(filhoEditando.id, neuro),
+      ]);
+      await editarFilho(filhoEditando.id, { alergias, neuro });
+      setModalEditar(false);
+      setFilhoEditando(null);
+    } catch {
+      Alert.alert('Erro', 'Não foi possível salvar as alterações. Verifique sua conexão.');
+    }
   };
 
   const abrirExcluir = (filho: Filho) => {
