@@ -287,10 +287,10 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   sectionTitulo: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '800',
-    color: '#b22300',
-    letterSpacing: -0.3,
+    color: '#1b1c16',
+    letterSpacing: -0.5,
   },
   sectionDesc: {
     fontSize: 15,

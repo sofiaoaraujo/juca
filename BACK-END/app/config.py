@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:8081"
 
     # Instrui o pydantic-settings a ler o arquivo .env na raiz do projeto
-    model_config = SettingsConfigDict(env_file="../.env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
 # Instância única (singleton) reutilizada em toda a aplicação
