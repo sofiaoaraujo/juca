@@ -37,6 +37,8 @@ O Juca enfrenta a seletividade alimentar que acomete 80% das crianças atípicas
 
 ## Demonstração
 
+[![Demonstração do Juca](https://img.youtube.com/vi/8-npHgnnckw/0.jpg)](https://youtu.be/8-npHgnnckw)
+
 ## Como rodar esse projeto?
 
 ### Pré-requisitos
