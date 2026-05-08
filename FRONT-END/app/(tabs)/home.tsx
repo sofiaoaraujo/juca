@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -19,7 +20,7 @@ import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../../context/FilhosContext';
 import { obterSugestoesFoodChaining, atualizarStatusNoCacheSugestoes, type SugestaoAlimento } from '../../services/gemini';
-import { salvarEtapaSOS, buscarEtapasSalvas, recusarAlimento, uploadFotoConquista } from '../../services/progresso';
+import { salvarEtapaSOS, buscarEtapasSalvas, buscarHistoricoIA, recusarAlimento, uploadFotoConquista } from '../../services/progresso';
 import { resolverImagem } from '../../utils/alimentos';
 import { supabase } from '../../services/supabase';
 
@@ -455,10 +456,23 @@ export default function Home() {
     if (!filhoAtivo?.id) return;
     setCarregandoSugestoes(true);
     try {
-      const resultado = await obterSugestoesFoodChaining(filhoAtivo.id, forceRefresh);
+      const [resultado, historico] = await Promise.all([
+        obterSugestoesFoodChaining(filhoAtivo.id, forceRefresh),
+        buscarHistoricoIA(filhoAtivo.id),
+      ]);
+
+      // Mapa de alimento_id → etapa_atual para sobrescrever o status vindo da API
+      const statusMap: Record<string, string> = {};
+      for (const item of historico) {
+        if (item.alimento_id && item.etapa_atual) {
+          statusMap[item.alimento_id] = item.etapa_atual;
+        }
+      }
+
       const comCores = resultado.map(s => {
         const cores = CORES_CATEGORIA[s.categoria ?? ''] ?? CORES_CATEGORIA.default;
-        return { ...s, name: s.nome, icon: cores.icon, corFundo: cores.fundo, corIcone: cores.icone };
+        const status = statusMap[s.id] ?? s.status;
+        return { ...s, name: s.nome, icon: cores.icon, corFundo: cores.fundo, corIcone: cores.icone, status };
       });
       setSugestoes(comCores);
     } catch (error) {

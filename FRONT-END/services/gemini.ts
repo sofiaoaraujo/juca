@@ -72,6 +72,23 @@ export async function obterSugestoesFoodChaining(criancaId: string, forceRefresh
   }
 }
 
+export async function atualizarStatusNoCacheSugestoes(
+  criancaId: string,
+  alimentoId: string,
+  status: string,
+): Promise<void> {
+  const cacheKey = `@juca:sugestoes:${criancaId}`;
+  try {
+    const cached = await AsyncStorage.getItem(cacheKey);
+    if (!cached) return;
+    const { data, timestamp } = JSON.parse(cached);
+    const atualizado = (data as SugestaoAlimento[]).map((s) =>
+      s.id === alimentoId ? { ...s, status } : s,
+    );
+    await AsyncStorage.setItem(cacheKey, JSON.stringify({ data: atualizado, timestamp }));
+  } catch { }
+}
+
 export async function gerarAnaliseRelatorio(criancaId: string, force = false): Promise<AnaliseRelatorio> {
   try {
     const url = `${BACKEND_URL}/ia/analise-relatorio/${criancaId}${force ? '?force=true' : ''}`;
