@@ -93,18 +93,27 @@ O projeto usa três arquivos .env. Copie os .env.example correspondentes e preen
 
 ### Back-end
 bash
+
 cd BACK-END
+
 python -m venv venv
+
 source venv/bin/activate
+
 pip install -r requirements.txt
+
 cp .env.example .env
+
 uvicorn app.main:app --reload --host 0.0.0.0
 
 
 ### Front-end
 bash
+
 cd FRONT-END
+
 npm install
+
 npx expo start --lan
 
 
