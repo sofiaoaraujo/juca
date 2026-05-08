@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import criancas, alimentos, progresso, usuarios, alergias, criancas_alergias, neurodivergencia, crianca_neurodivergencia, ia
+from app.routers import criancas, alimentos, progresso, usuarios, alergias, criancas_alergias, neurodivergencia, crianca_neurodivergencia, ia, chat
 
 
 # ---------------------------------------------------------------------------
@@ -51,6 +51,7 @@ app.include_router(criancas_alergias.router)
 app.include_router(ia.router)
 app.include_router(neurodivergencia.router)
 app.include_router(crianca_neurodivergencia.router)
+app.include_router(chat.router)
 
 # ---------------------------------------------------------------------------
 # Endpoint de Health Check

@@ -19,8 +19,8 @@ import ConfettiCannon from 'react-native-confetti-cannon';
 import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFilhos } from '../../context/FilhosContext';
-import { obterSugestoesFoodChaining, type SugestaoAlimento } from '../../services/gemini';
-import { salvarEtapaSOS, buscarEtapasSalvas, recusarAlimento, uploadFotoConquista } from '../../services/progresso';
+import { obterSugestoesFoodChaining, atualizarStatusNoCacheSugestoes, type SugestaoAlimento } from '../../services/gemini';
+import { salvarEtapaSOS, buscarEtapasSalvas, buscarHistoricoIA, recusarAlimento, uploadFotoConquista } from '../../services/progresso';
 import { resolverImagem } from '../../utils/alimentos';
 import { supabase } from '../../services/supabase';
 
@@ -456,10 +456,23 @@ export default function Home() {
     if (!filhoAtivo?.id) return;
     setCarregandoSugestoes(true);
     try {
-      const resultado = await obterSugestoesFoodChaining(filhoAtivo.id, forceRefresh);
+      const [resultado, historico] = await Promise.all([
+        obterSugestoesFoodChaining(filhoAtivo.id, forceRefresh),
+        buscarHistoricoIA(filhoAtivo.id),
+      ]);
+
+      // Mapa de alimento_id → etapa_atual para sobrescrever o status vindo da API
+      const statusMap: Record<string, string> = {};
+      for (const item of historico) {
+        if (item.alimento_id && item.etapa_atual) {
+          statusMap[item.alimento_id] = item.etapa_atual;
+        }
+      }
+
       const comCores = resultado.map(s => {
         const cores = CORES_CATEGORIA[s.categoria ?? ''] ?? CORES_CATEGORIA.default;
-        return { ...s, name: s.nome, icon: cores.icon, corFundo: cores.fundo, corIcone: cores.icone };
+        const status = statusMap[s.id] ?? s.status;
+        return { ...s, name: s.nome, icon: cores.icon, corFundo: cores.fundo, corIcone: cores.icone, status };
       });
       setSugestoes(comCores);
     } catch (error) {
@@ -537,21 +550,15 @@ export default function Home() {
 
   const onRecusarAlimento = async () => {
     if (filhoAtivo?.id && alimentoAtivo?.id) {
-      recusarAlimento(filhoAtivo.id, alimentoAtivo.id).catch(e =>
+      const criancaId  = filhoAtivo.id;
+      const alimentoId = alimentoAtivo.id;
+      recusarAlimento(criancaId, alimentoId).catch(e =>
         console.error('Erro ao registrar recusa:', e)
       );
-      const idRecusado = alimentoAtivo.id;
-      const novas = sugestoes.map(s =>
-        s.id === idRecusado ? { ...s, status: 'Recusado' } : s
-      );
-      setSugestoes(novas);
-
-      const cacheKey = `@juca:sugestoes:${filhoAtivo.id}`;
-      const cached = await AsyncStorage.getItem(cacheKey);
-      if (cached) {
-        const { timestamp } = JSON.parse(cached);
-        await AsyncStorage.setItem(cacheKey, JSON.stringify({ data: novas, timestamp }));
-      }
+      setSugestoes(prev => prev.map(s =>
+        s.id === alimentoId ? { ...s, status: 'Recusado' } : s
+      ));
+      atualizarStatusNoCacheSugestoes(criancaId, alimentoId, 'Recusado').catch(() => {});
     }
     fecharTrilha();
   };

@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
 
   header: { marginBottom: 28 },
   headerSuper: { fontSize: 11, fontWeight: '700', color: '#904c1f', letterSpacing: 1.5, marginBottom: 4 },
-  headerTitulo: { fontSize: 30, fontWeight: '800', color: '#1b1c16', letterSpacing: -0.5 },
+  headerTitulo: { fontSize: 26, fontWeight: '800', color: '#1b1c16', letterSpacing: -0.5 },
 
   secaoTitulo: { fontSize: 11, fontWeight: '700', color: '#904c1f', letterSpacing: 1.5, marginBottom: 14 },
 
