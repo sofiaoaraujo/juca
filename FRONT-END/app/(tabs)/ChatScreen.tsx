@@ -27,7 +27,7 @@ interface Message {
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
-const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? "http://192.168.1.12:8000";
+const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? "http://ipv4:8000";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 // Paleta — creme/off-white do Stitch + navy bold + terracota como acento
