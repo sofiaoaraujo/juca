@@ -123,7 +123,7 @@ export default function Relatorio() {
       const resultado = await gerarAnaliseRelatorio(filhoAtivo.id, force);
       setAnalise(resultado);
     } catch (error) {
-      console.error('Erro ao gerar análise:', error);
+      console.warn('Erro ao gerar análise:', error);
     } finally {
       setCarregandoAnalise(false);
     }
