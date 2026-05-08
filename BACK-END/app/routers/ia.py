@@ -282,7 +282,7 @@ async def gerar_analise_relatorio(crianca_id: str, force: bool = False):
             )
             relatorio_salvo = crianca_resp.data.get("relatorio_ia") if crianca_resp.data else None
             if relatorio_salvo:
-                return json.loads(relatorio_salvo)
+                return relatorio_salvo if isinstance(relatorio_salvo, dict) else json.loads(relatorio_salvo)
 
         progresso_data = supabase.table("crianca_alimento") \
             .select("*, alimentos(nome, textura, cor, sabor)") \
