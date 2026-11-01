@@ -24,7 +24,7 @@ function CajuPattern({ tileHeight }: { tileHeight: number }) {
   const cols = Math.ceil(width / TILE_SIZE) + 1;
   const rows = Math.ceil(tileHeight / TILE_SIZE) + 1;
   return (
-    <View style={[StyleSheet.absoluteFillObject, { overflow: 'hidden' }]}>
+    <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}>
       {Array.from({ length: rows }).map((_, row) =>
         Array.from({ length: cols }).map((_, col) => (
           <Image

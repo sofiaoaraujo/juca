@@ -101,7 +101,7 @@ export default function ChatScreen() {
   const [input, setInput]       = useState("");
   const [loading, setLoading]   = useState(false);
   const [showChips, setShowChips] = useState(true);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
 
   // Mensagem de boas-vindas — atualiza quando o filho ativo muda
   useEffect(() => {

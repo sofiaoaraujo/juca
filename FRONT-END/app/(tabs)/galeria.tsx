@@ -44,7 +44,7 @@ export default function Galeria() {
   const [fotoAmpliada, setFotoAmpliada] = useState<ConquistaFoto | null>(null);
   const [buscaAtiva, setBuscaAtiva] = useState(false);
   const [termoBusca, setTermoBusca] = useState('');
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -206,7 +206,7 @@ export default function Galeria() {
         >
           <View style={styles.modalOverlay}>
             <TouchableOpacity
-              style={StyleSheet.absoluteFillObject}
+              style={StyleSheet.absoluteFill}
               activeOpacity={1}
               onPress={() => setFotoAmpliada(null)}
             />
